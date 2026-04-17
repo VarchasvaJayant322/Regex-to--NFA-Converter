@@ -1,0 +1,3739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Regex → ε-NFA Visualizer (Student Edition)</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg1: #0a0f1e;
+      --bg2: #0f1729;
+      --panel: rgba(255,255,255,0.055);
+      --panel-strong: rgba(255,255,255,0.1);
+      --border: rgba(255,255,255,0.1);
+      --text: #e8f0fc;
+      --muted: #8da0be;
+      --accent: #6d28d9;
+      --accent-2: #0891b2;
+      --accent-3: #7c3aed;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --eps-color: #f59e0b;
+      --sym-color: #93c5fd;
+      --shadow: 0 24px 60px rgba(0,0,0,0.4);
+      --radius: 20px;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Sora', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background: var(--bg1);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 10% -10%, rgba(109,40,217,0.22), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(8,145,178,0.16), transparent),
+        radial-gradient(ellipse 40% 60% at 50% 100%, rgba(109,40,217,0.08), transparent);
+      padding: 24px;
+    }
+
+    .app { max-width: 1440px; margin: 0 auto; display: grid; gap: 18px; }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.7rem, 2.8vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #c4b5fd, #67e8f9, #a5f3fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .hero p { color: var(--muted); font-size: 0.95rem; line-height: 1.65; max-width: 680px; }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .badge {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(109,40,217,0.18);
+      border: 1px solid rgba(109,40,217,0.35);
+      font-size: 0.8rem;
+      color: #c4b5fd;
+      font-weight: 600;
+    }
+
+    .demo-card {
+      background: linear-gradient(135deg, rgba(109,40,217,0.2), rgba(8,145,178,0.12));
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px 20px;
+      min-width: 200px;
+    }
+    .demo-card .label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+    .demo-card .expr { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; color: #c4b5fd; }
+    .demo-card .hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    /* ── Theory Panel ── */
+    .theory-panel { padding: 0; overflow: hidden; }
+
+    .theory-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .theory-header:hover { background: rgba(255,255,255,0.03); }
+    .theory-header.open { border-bottom-color: var(--border); }
+
+    .theory-header-left { display: flex; align-items: center; gap: 12px; }
+    .theory-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, rgba(109,40,217,0.4), rgba(8,145,178,0.3));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .theory-header h2 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+    .theory-header p { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+    .chevron { font-size: 1.1rem; color: var(--muted); transition: transform 0.3s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    .theory-body {
+      display: none;
+      padding: 24px;
+      gap: 18px;
+    }
+    .theory-body.open { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+    .theory-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .theory-card h3 {
+      font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .theory-card h3 .tc-icon {
+      width: 24px; height: 24px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800;
+    }
+    .theory-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.65; }
+    .theory-card .example {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: #a5f3fc;
+    }
+
+    /* ── Controls ── */
+    .controls { padding: 20px 24px; display: grid; gap: 16px; }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .input-wrap label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    #re {
+      display: none; /* hidden — value synced from mirror div */
+    }
+
+    /* Visible contenteditable mirror that shows superscript * + ? */
+    .re-mirror {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.3);
+      color: white;
+      font-size: 1rem;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      min-height: 52px;
+      line-height: 1.4;
+      cursor: text;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .re-mirror:focus {
+      border-color: rgba(8,145,178,0.6);
+      box-shadow: 0 0 0 3px rgba(8,145,178,0.12);
+    }
+    .re-mirror:empty::before {
+      content: attr(data-placeholder);
+      color: #4a5568;
+      pointer-events: none;
+    }
+    /* Superscript operators rendered inside the mirror */
+    .re-mirror sup {
+      font-size: 0.65em;
+      line-height: 0;
+      vertical-align: super;
+      color: #c4b5fd;
+    }
+
+    .btn {
+      padding: 14px 20px;
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 8px 24px rgba(109,40,217,0.3); }
+    .btn-secondary { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+    .btn-secondary:active { transform: scale(0.98); }
+
+    .btn-epsilon {
+      padding: 14px 16px;
+      background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(245,158,11,0.2));
+      border: 1.5px solid rgba(245,158,11,0.5);
+      border-radius: 14px;
+      color: #fcd34d;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-epsilon:hover {
+      background: linear-gradient(135deg, rgba(245,158,11,0.4), rgba(245,158,11,0.3));
+      border-color: rgba(245,158,11,0.8);
+      box-shadow: 0 0 12px rgba(245,158,11,0.2);
+    }
+    .btn-epsilon:active { transform: scale(0.98); }
+    .btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    .btn:active { transform: translateY(0); }
+
+    .quick-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .quick-label { font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+    .chip {
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-family: var(--mono);
+      font-weight: 600;
+      transition: 0.18s ease;
+    }
+    .chip:hover { background: rgba(109,40,217,0.2); border-color: rgba(109,40,217,0.4); color: #c4b5fd; transform: translateY(-1px); }
+
+    #err {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.35);
+      color: #fca5a5;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 12px; }
+    .stat {
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .stat .label { color: var(--muted); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .stat .value { font-size: 1.5rem; font-weight: 800; font-family: var(--mono); }
+
+    /* ── Cheatsheet ── */
+    .cheatsheet {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 18px 24px;
+      border-top: 1px solid var(--border);
+    }
+    .cheat-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+    }
+    .cheat-sym {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      color: #c4b5fd;
+      min-width: 28px;
+      text-align: center;
+      padding: 2px 6px;
+      background: rgba(109,40,217,0.2);
+      border-radius: 6px;
+    }
+    .cheat-info .name { font-size: 0.82rem; font-weight: 700; }
+    .cheat-info .desc { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+    .cheat-info .eg { font-family: var(--mono); font-size: 0.72rem; color: #67e8f9; margin-top: 3px; }
+
+    /* ── Main Grid ── */
+    .main-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 18px; }
+
+    /* ── Canvas Panel ── */
+    .panel-head { padding: 18px 22px 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .panel-head h2 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+    .panel-head p { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+
+    .legend { display: flex; gap: 8px; flex-wrap: wrap; }
+    .legend span {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; color: var(--muted);
+      padding: 6px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .dot-start { background: var(--accent-2); }
+    .dot-accept { background: var(--success); }
+    .dot-epsilon { background: var(--warning); }
+
+    #canvas-area { padding: 16px 18px 20px; overflow: auto; }
+    .canvas-card {
+      min-height: 480px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      position: relative;
+      overflow: auto;
+    }
+    .canvas-placeholder {
+      text-align: center;
+      color: var(--muted);
+      max-width: 380px;
+      line-height: 1.7;
+      padding: 40px 20px;
+      font-size: 0.9rem;
+    }
+    .canvas-placeholder .ph-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+    #c { display: block; max-width: none; }
+
+    /* ── Epsilon Closure Inspector ── */
+    .closure-bar {
+      display: none;
+      margin: 0 18px 14px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+      font-size: 0.85rem;
+    }
+    .closure-bar.visible { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .closure-bar .cl-label { color: var(--warning); font-weight: 700; }
+    .closure-states { display: flex; gap: 6px; flex-wrap: wrap; }
+    .closure-state {
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(245,158,11,0.2);
+      border: 1px solid rgba(245,158,11,0.4);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: #fcd34d;
+    }
+    .closure-hint { color: var(--muted); font-size: 0.78rem; margin-left: auto; }
+
+    /* ── Transition Table ── */
+    .table-wrap { padding: 16px 18px 20px; }
+    .table-shell {
+      border-radius: 14px;
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.15);
+      max-height: 480px;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 380px; }
+    th, td { padding: 12px 14px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.06); border-right: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; }
+    th { position: sticky; top: 0; background: rgba(15,23,42,0.95); color: var(--text); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; backdrop-filter: blur(8px); }
+    tr:hover td { background: rgba(255,255,255,0.04); }
+    td:first-child, th:first-child { background: rgba(255,255,255,0.05); font-weight: 700; font-family: var(--mono); }
+    td.clickable-state { cursor: pointer; transition: background 0.15s; }
+    td.clickable-state:hover { background: rgba(245,158,11,0.15) !important; color: #fcd34d; }
+    td.highlighted-row { background: rgba(245,158,11,0.1) !important; }
+
+    /* ── String Tester ── */
+    .tester-panel { padding: 20px 24px; display: grid; gap: 14px; }
+    .tester-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+
+    #testStr {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.25);
+      color: white;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      outline: none;
+      transition: 0.2s;
+    }
+    #testStr:focus { border-color: rgba(16,185,129,0.5); box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
+
+    .result-box {
+      display: none;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .result-box.visible { display: block; }
+
+    .result-header {
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+    }
+    .result-header.accept { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 14px 14px 0 0; color: #6ee7b7; }
+    .result-header.reject { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 14px 14px 0 0; color: #fca5a5; }
+    .result-icon { font-size: 1.4rem; }
+
+    .trace-area {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      overflow: hidden;
+    }
+
+    .trace-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-wrap: wrap;
+    }
+    .trace-controls .btn-sm {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: var(--sans);
+      transition: 0.15s;
+    }
+    .trace-controls .btn-sm:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .trace-controls .btn-sm:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .step-indicator { font-size: 0.8rem; color: var(--muted); font-family: var(--mono); }
+
+    .trace-steps { max-height: 240px; overflow-y: auto; }
+
+    .trace-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.82rem;
+      opacity: 0.5;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .trace-step.current { background: rgba(109,40,217,0.15); opacity: 1; border-left: 3px solid #7c3aed; }
+    .trace-step.done { opacity: 0.75; }
+    .trace-step .step-num {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      min-width: 22px;
+      padding-top: 1px;
+    }
+    .trace-step .step-char {
+      font-family: var(--mono);
+      font-weight: 700;
+      min-width: 24px;
+    }
+    .trace-step .step-char.epsilon { color: var(--warning); }
+    .trace-step .step-char.char { color: var(--sym-color); }
+    .trace-step .step-states { display: flex; gap: 4px; flex-wrap: wrap; }
+    .trace-step .mini-state {
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+    }
+    .trace-step .mini-state.active { background: rgba(109,40,217,0.3); color: #c4b5fd; }
+    .trace-step .mini-state.accept { background: rgba(16,185,129,0.25); color: #6ee7b7; }
+
+    /* ── Step-by-Step Construction ── */
+    .step-panel { padding: 20px 24px; display: grid; gap: 14px; }
+    .step-header-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .step-header-row h2 { font-size: 1rem; font-weight: 700; }
+    .step-header-row p { color: var(--muted); font-size: 0.82rem; }
+
+    .construction-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .step-count-badge {
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(109,40,217,0.2);
+      border: 1px solid rgba(109,40,217,0.35);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: #c4b5fd;
+    }
+
+    .step-log {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .step-log-entry {
+      display: flex;
+      gap: 12px;
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.82rem;
+      align-items: flex-start;
+    }
+    .step-log-entry:last-child { border-bottom: none; }
+    .step-log-entry .sl-num { font-family: var(--mono); color: var(--muted); font-size: 0.75rem; min-width: 28px; padding-top: 1px; }
+    .step-log-entry .sl-op {
+      padding: 1px 8px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      min-width: 64px;
+      text-align: center;
+    }
+    .sl-op.cat  { background: rgba(8,145,178,0.2); color: #67e8f9; border: 1px solid rgba(8,145,178,0.3); }
+    .sl-op.uni  { background: rgba(245,158,11,0.18); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .sl-op.star { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+    .sl-op.plus { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .sl-op.opt  { background: rgba(124,58,237,0.2); color: #c4b5fd; border: 1px solid rgba(124,58,237,0.3); }
+    .sl-op.char { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid rgba(255,255,255,0.12); }
+    .step-log-entry .sl-desc { color: var(--muted); line-height: 1.5; }
+    .step-log-entry .sl-desc strong { color: var(--text); }
+    .step-log-entry.current-step { background: rgba(109,40,217,0.12); }
+
+    /* ── Parse Tree ── */
+    .parse-tree-area {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 120px;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      overflow-x: auto;
+    }
+    .parse-tree-area .pt-placeholder { color: var(--muted); font-style: italic; font-family: var(--sans); }
+
+    .pt-node { display: inline-flex; flex-direction: column; align-items: center; gap: 0; }
+    .pt-label {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+    .pt-label.op-cat  { background: rgba(8,145,178,0.2); color: #67e8f9; }
+    .pt-label.op-uni  { background: rgba(245,158,11,0.18); color: #fcd34d; }
+    .pt-label.op-star { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+    .pt-label.op-plus { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .pt-label.op-opt  { background: rgba(124,58,237,0.2); color: #c4b5fd; }
+    .pt-label.op-char { background: rgba(255,255,255,0.07); color: #93c5fd; }
+    .pt-children { display: flex; gap: 12px; padding-top: 6px; position: relative; }
+    .pt-branch { display: flex; flex-direction: column; align-items: center; }
+    .pt-line { width: 1px; height: 14px; background: rgba(255,255,255,0.2); margin-bottom: 0; }
+
+    /* ── Export ── */
+    .export-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 24px;
+      border-top: 1px solid var(--border);
+    }
+    .export-bar .notes-wrap { flex: 1; min-width: 200px; }
+    #notes {
+      width: 100%;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.83rem;
+      padding: 9px 12px;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+      transition: 0.2s;
+    }
+    #notes::placeholder { color: #3a4a60; }
+    #notes:focus { border-color: rgba(109,40,217,0.4); }
+    .export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ── Footer ── */
+    .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 4px 0 8px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) { .control-grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 560px) { body { padding: 12px; } .stats { grid-template-columns: 1fr; } }
+
+    /* ── DFA Section ── */
+    .dfa-section { display: grid; gap: 18px; }
+
+    .dfa-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+      padding: 20px 24px 0;
+    }
+    .dfa-header-row h2 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+    .dfa-header-row p { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+    .dfa-badge {
+      padding: 5px 14px; border-radius: 999px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.15));
+      border: 1px solid rgba(16,185,129,0.35);
+      font-size: 0.8rem; color: #6ee7b7; font-weight: 700;
+    }
+
+    .dfa-convert-bar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 0 24px 18px;
+    }
+
+    .dfa-stats-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      padding: 0 24px 18px;
+    }
+    .dfa-stat {
+      padding: 12px 14px; border-radius: 12px;
+      background: rgba(16,185,129,0.07);
+      border: 1px solid rgba(16,185,129,0.15);
+    }
+    .dfa-stat .label { font-size: 0.75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .dfa-stat .value { font-size: 1.3rem; font-weight: 800; font-family: var(--mono); color: #6ee7b7; }
+
+    /* DFA canvas area */
+    .dfa-canvas-card {
+      min-height: 420px; border-radius: 16px;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(16,185,129,0.12);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; position: relative; overflow: auto;
+      margin: 0 24px 20px;
+    }
+    #dfaCanvas { display: block; max-width: none; }
+    .dfa-placeholder {
+      text-align: center; color: var(--muted);
+      max-width: 360px; line-height: 1.7; padding: 40px 20px; font-size: 0.9rem;
+    }
+    .dfa-placeholder .ph-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.35; }
+
+    /* DFA transition table */
+    .dfa-table-shell {
+      border-radius: 14px; overflow: auto;
+      border: 1px solid rgba(16,185,129,0.15);
+      background: rgba(0,0,0,0.1);
+      max-height: 400px;
+      margin: 0 24px 20px;
+    }
+    .dfa-table-shell table { width: 100%; border-collapse: collapse; min-width: 300px; }
+    .dfa-table-shell th, .dfa-table-shell td {
+      padding: 10px 14px; text-align: center; font-size: 0.83rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      border-right: 1px solid rgba(255,255,255,0.05);
+    }
+    .dfa-table-shell th {
+      position: sticky; top: 0; background: rgba(10,20,35,0.95);
+      color: #6ee7b7; font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      backdrop-filter: blur(8px);
+    }
+    .dfa-table-shell td:first-child, .dfa-table-shell th:first-child {
+      background: rgba(16,185,129,0.06); font-family: var(--mono); font-weight: 700;
+    }
+    .dfa-row-accept td { color: #6ee7b7; }
+    .dfa-row-active td { background: rgba(109,40,217,0.18) !important; }
+    .dfa-row-trap td { color: #ef4444; opacity: 0.6; }
+
+    /* DFA Simulator */
+    .dfa-sim-panel { padding: 20px 24px; display: grid; gap: 14px; }
+    .dfa-sim-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: end; }
+    #dfaSimStr {
+      width: 100%; padding: 12px 16px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.25); color: white;
+      font-family: var(--mono); font-size: 0.95rem; outline: none; transition: 0.2s;
+    }
+    #dfaSimStr:focus { border-color: rgba(16,185,129,0.5); box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
+
+    /* DFA simulation tape */
+    .tape-wrap {
+      background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .tape-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .tape-cells { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .tape-cell {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-size: 0.9rem; font-weight: 700;
+      border: 2px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      transition: all 0.3s ease;
+    }
+    .tape-cell.current {
+      background: rgba(109,40,217,0.35); border-color: #7c3aed;
+      color: #c4b5fd; transform: scale(1.15);
+      box-shadow: 0 0 16px rgba(124,58,237,0.4);
+    }
+    .tape-cell.consumed { background: rgba(255,255,255,0.03); color: var(--muted); border-color: rgba(255,255,255,0.05); }
+    .tape-cell.accepted { background: rgba(16,185,129,0.25); border-color: #10b981; color: #6ee7b7; }
+    .tape-cell.rejected { background: rgba(239,68,68,0.2); border-color: #ef4444; color: #fca5a5; }
+    .tape-head { font-size: 0.7rem; color: var(--muted); text-align: center; margin-top: 4px; }
+
+    /* DFA simulation steps */
+    .dfa-sim-steps { max-height: 220px; overflow-y: auto; }
+    .dfa-sim-step {
+      display: flex; gap: 10px; padding: 8px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.82rem; align-items: center;
+      opacity: 0.55; transition: opacity 0.2s, background 0.2s;
+    }
+    .dfa-sim-step.current { background: rgba(109,40,217,0.15); opacity: 1; border-left: 3px solid #7c3aed; }
+    .dfa-sim-step.done { opacity: 0.7; }
+    .dfa-sim-step .ss-state {
+      font-family: var(--mono); font-size: 0.8rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 6px;
+      background: rgba(255,255,255,0.07); min-width: 60px; text-align: center;
+    }
+    .dfa-sim-step .ss-state.accepting { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    .dfa-sim-step .ss-state.trap { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .dfa-sim-step .ss-char { font-family: var(--mono); color: #93c5fd; font-weight: 700; min-width: 28px; }
+    .dfa-sim-step .ss-desc { color: var(--muted); font-size: 0.78rem; }
+
+    /* Comparison panel */
+    .compare-panel {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px; padding: 16px 20px; margin: 0 24px 20px;
+    }
+    .compare-title { font-size: 0.82rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .compare-col h4 { font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; }
+    .compare-col ul { list-style: none; }
+    .compare-col ul li { font-size: 0.8rem; color: var(--muted); padding: 3px 0; display: flex; gap: 6px; }
+    .compare-col ul li::before { content: '→'; color: var(--accent-2); }
+    .nfa-col h4 { color: #f59e0b; }
+    .dfa-col h4 { color: #6ee7b7; }
+
+    /* Legend for DFA */
+    .dfa-legend { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 24px 14px; }
+    .dfa-legend span {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; color: var(--muted);
+      padding: 5px 9px; border-radius: 999px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    }
+    .dot-dfa-start { background: #0891b2; }
+    .dot-dfa-accept { background: #10b981; }
+    .dot-dfa-trap { background: #ef4444; }
+    .dot-dfa-normal { background: rgba(255,255,255,0.3); }
+
+    /* ── Step-wise DFA Construction Panel ── */
+    .dfa-steps-panel {
+      margin: 0 0 4px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .dfa-steps-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px;
+      padding: 16px 22px;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(109,40,217,0.08);
+      border-bottom: 1px solid transparent;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .dfa-steps-header:hover { background: rgba(109,40,217,0.13); }
+    .dfa-steps-header.open  { border-bottom-color: rgba(255,255,255,0.08); }
+
+    .dfa-steps-header h3 { font-size: 0.95rem; font-weight: 700; }
+    .dfa-steps-header p  { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+    .dfa-steps-body { display: none; }
+    .dfa-steps-body.open { display: grid; grid-template-columns: 380px 1fr; gap: 0; }
+
+    /* Left: step log list */
+    .dfa-step-log {
+      max-height: 520px; overflow-y: auto;
+      border-right: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .dfa-step-entry {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .dfa-step-entry:hover   { background: rgba(255,255,255,0.04); }
+    .dfa-step-entry.active  { background: rgba(109,40,217,0.18); border-left: 3px solid #7c3aed; }
+
+    .dse-num {
+      font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+      min-width: 22px; padding-top: 2px; flex-shrink: 0;
+    }
+    .dse-body { flex: 1; min-width: 0; }
+    .dse-title {
+      font-size: 0.82rem; font-weight: 700; margin-bottom: 3px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .dse-state-tag {
+      display: inline-flex; align-items: center;
+      padding: 1px 8px; border-radius: 999px;
+      font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+    }
+    .dse-state-tag.new-state  { background: rgba(109,40,217,0.25); color: #c4b5fd; border: 1px solid rgba(109,40,217,0.4); }
+    .dse-state-tag.exist-state{ background: rgba(255,255,255,0.08); color: #dbeafe; border: 1px solid rgba(255,255,255,0.12); }
+    .dse-state-tag.trap-state { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .dse-state-tag.accept-tag { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+
+    .dse-detail { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+    .dse-detail strong { color: var(--text); }
+
+    .dse-transitions {
+      margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .dse-trans-chip {
+      font-family: var(--mono); font-size: 0.7rem;
+      padding: 1px 7px; border-radius: 6px;
+      background: rgba(8,145,178,0.15); color: #67e8f9;
+      border: 1px solid rgba(8,145,178,0.25);
+    }
+
+    /* Right: live partial DFA diagram */
+    .dfa-step-canvas-wrap {
+      display: flex; flex-direction: column;
+      background: rgba(0,0,0,0.15);
+    }
+    .dfa-step-canvas-head {
+      padding: 10px 16px;
+      font-size: 0.78rem; color: var(--muted);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .dfa-step-canvas-head strong { color: var(--text); }
+    #dfaStepCanvas {
+      display: block; max-width: 100%;
+      overflow: auto;
+    }
+
+    /* Controls bar */
+    .dfa-steps-controls {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.1);
+    }
+    .dfa-steps-controls .btn-sm {
+      padding: 6px 14px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--text); cursor: pointer;
+      font-size: 0.8rem; font-weight: 700;
+      font-family: var(--sans); transition: 0.15s;
+    }
+    .dfa-steps-controls .btn-sm:hover   { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .dfa-steps-controls .btn-sm:disabled{ opacity: 0.35; cursor: not-allowed; transform: none; }
+    .dfa-steps-controls .btn-sm.autoplay-active { background: rgba(109,40,217,0.3); border-color: rgba(109,40,217,0.5); color: #c4b5fd; }
+
+    .dfa-steps-indicator {
+      font-family: var(--mono); font-size: 0.8rem; color: var(--muted);
+    }
+
+    /* Phase badge (Subset Construction / Minimization) */
+    .phase-badge {
+      padding: 2px 10px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700;
+    }
+    .phase-badge.subset { background: rgba(8,145,178,0.2); color: #67e8f9; border: 1px solid rgba(8,145,178,0.3); }
+    .phase-badge.min    { background: rgba(245,158,11,0.18); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .phase-badge.done   { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+
+    @media (max-width: 900px) {
+      .dfa-steps-body.open { grid-template-columns: 1fr; }
+      .dfa-step-log { max-height: 260px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div>
+      <h1>Regex → ε-NFA Visualizer</h1>
+      <p>Interactive tool for Thompson's Construction. Enter any regular expression to build its ε-NFA, trace string acceptance, inspect ε-closures, and understand each construction step.</p>
+      <div class="badge-row">
+        <span class="badge">Thompson's Construction</span>
+        <span class="badge">Step-by-Step Walkthrough</span>
+        <span class="badge">String Acceptance Tester</span>
+        <span class="badge">ε-Closure Inspector</span>
+        <span class="badge">Parse Tree</span>
+        <span class="badge">✨ Animated Graph</span>
+        <span class="badge">🔄 ε-NFA → DFA Conversion</span>
+        <span class="badge">🎮 DFA Simulator</span>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="label">Try this expression</div>
+      <div class="expr">a(b|c)*</div>
+      <div class="hint">Supports: | * + ? () [] ε</div>
+    </div>
+  </section>
+
+  <!-- ── Theory Panel ── -->
+  <section class="panel theory-panel">
+    <div class="theory-header" onclick="toggleTheory()">
+      <div class="theory-header-left">
+        <div class="theory-icon">📖</div>
+        <div>
+          <h2>Theory &amp; Background — How does this work?</h2>
+          <p>Click to expand concept cards for ε-NFA, Thompson's Construction, and more</p>
+        </div>
+      </div>
+      <span class="chevron" id="chevron">▼</span>
+    </div>
+    <div class="theory-body" id="theoryBody">
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(8,145,178,0.25);color:#67e8f9">ε</span> What is an ε-NFA?</h3>
+        <p>A <strong>Nondeterministic Finite Automaton with ε-transitions</strong> is a state machine where the machine can simultaneously be in multiple states, and can transition between states without consuming any input (via ε-moves).</p>
+        <div class="example">States: {q0, q1, q2}<br>Alphabet: {a, b}<br>ε-moves allow "free" jumps</div>
+      </div>
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(109,40,217,0.25);color:#c4b5fd">⚙</span> Thompson's Construction</h3>
+        <p>A recursive algorithm that builds an ε-NFA from a regular expression. Each operator (|, *, +, ?) has a corresponding NFA fragment that gets composed together. Every fragment has exactly <strong>one start and one accept state</strong>.</p>
+        <div class="example">RE → Parse → NFA fragments → Compose</div>
+      </div>
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(245,158,11,0.2);color:#fcd34d">∪</span> Union: A|B</h3>
+        <p>Creates a new start state with ε-transitions to both A and B's starts. Creates a new accept state reachable via ε from both A and B's accept states. The machine nondeterministically picks a branch.</p>
+        <div class="example">q_new →ε→ q_A_start<br>q_new →ε→ q_B_start<br>q_A_end →ε→ q_accept</div>
+      </div>
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(16,185,129,0.2);color:#6ee7b7">·</span> Concatenation: AB</h3>
+        <p>Connect A's accept state to B's start state with an ε-transition. The result uses A's start state and B's accept state. This sequences the two automata.</p>
+        <div class="example">q_A_start → … → q_A_end<br>q_A_end →ε→ q_B_start<br>q_B_start → … → q_B_end</div>
+      </div>
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(239,68,68,0.2);color:#fca5a5">★</span> Kleene Star: A*</h3>
+        <p>Add a new start and accept state. The new start connects via ε to A's start and directly to the new accept (allowing zero repetitions). A's accept loops back to A's start for repeated matching.</p>
+        <div class="example">q_new →ε→ q_A (or skip)<br>q_A_end →ε→ q_A_start (loop)<br>q_A_end →ε→ q_accept</div>
+      </div>
+      <div class="theory-card">
+        <h3><span class="tc-icon" style="background:rgba(124,58,237,0.2);color:#a78bfa">ε</span> ε-Closure</h3>
+        <p>The ε-closure of a state S is the set of <em>all</em> states reachable from S by following zero or more ε-transitions. When processing input, we always expand the current state set to its full ε-closure first.</p>
+        <div class="example">ε-closure({q0}) = {q0, q1, q3}<br>(via free ε-jumps from q0)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Controls + Cheatsheet ── -->
+  <section class="panel controls">
+    <div class="control-grid">
+      <div class="input-wrap">
+        <label for="reMirror">Regular Expression</label>
+        <!-- Hidden input holds raw value — read by all existing JS unchanged -->
+        <input id="re" type="text" autocomplete="off" spellcheck="false" tabindex="-1" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" />
+        <!-- Visible mirror renders * + ? as superscripts -->
+        <div id="reMirror" class="re-mirror"
+             contenteditable="true"
+             spellcheck="false"
+             autocorrect="off"
+             autocapitalize="off"
+             data-placeholder="a(b|c)* or (ab)+|c or [a-z]*"
+             role="textbox"
+             aria-label="Regular Expression"></div>
+      </div>
+      <button class="btn btn-epsilon" onclick="insertEpsilon()" title="Insert epsilon (ε) symbol">ε</button>
+      <button class="btn btn-primary" onclick="build()">▶ Build NFA</button>
+      <button class="btn btn-secondary" onclick="clearAll()">✕ Clear</button>
+    </div>
+
+    <div class="quick-row">
+      <span class="quick-label">Examples:</span>
+      <button class="chip" onclick="setExample('a(b|c)*')">a(b|c)*</button>
+      <button class="chip" onclick="setExample('(ab)+')">(ab)+</button>
+      <button class="chip" onclick="setExample('a?b*')">a?b*</button>
+      <button class="chip" onclick="setExample('[a-c]b')">[a-c]b</button>
+      <button class="chip" onclick="setExample('(a|b)*abb')">(a|b)*abb</button>
+      <button class="chip" onclick="setExample('a*b*c')">a*b*c</button>
+      <button class="chip" onclick="setExample('a|ε')">a|ε</button>
+    </div>
+
+    <div id="err"></div>
+
+    <div class="stats">
+      <div class="stat"><div class="label">States</div><div class="value" id="stateCount">0</div></div>
+      <div class="stat"><div class="label">Transitions</div><div class="value" id="edgeCount">0</div></div>
+      <div class="stat"><div class="label">Symbols</div><div class="value" id="symbolCount">0</div></div>
+      <div class="stat"><div class="label">Start → Accept</div><div class="value" id="startAccept" style="font-size:1.1rem">—</div></div>
+    </div>
+
+    <!-- Operator Cheatsheet -->
+    <div style="padding: 14px 0 0; border-top: 1px solid rgba(255,255,255,0.06);">
+      <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;">Operator Reference</div>
+      <div class="cheatsheet" style="padding:0">
+        <div class="cheat-item"><span class="cheat-sym">|</span><div class="cheat-info"><div class="name">Union / Alternation</div><div class="desc">Match A or B</div><div class="eg">a|b → "a" or "b"</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">*</span><div class="cheat-info"><div class="name">Kleene Star</div><div class="desc">Zero or more repetitions</div><div class="eg">a* → "", "a", "aa"…</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">+</span><div class="cheat-info"><div class="name">One or More</div><div class="desc">One or more repetitions</div><div class="eg">a+ → "a", "aa", "aaa"…</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">?</span><div class="cheat-info"><div class="name">Optional</div><div class="desc">Zero or one occurrence</div><div class="eg">a? → "" or "a"</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">()</span><div class="cheat-info"><div class="name">Grouping</div><div class="desc">Group sub-expressions</div><div class="eg">(ab)* → "", "ab", "abab"…</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">[]</span><div class="cheat-info"><div class="name">Character Class</div><div class="desc">Match any listed character</div><div class="eg">[a-c] → "a","b", or "c"</div></div></div>
+        <div class="cheat-item"><span class="cheat-sym">ε</span><div class="cheat-info"><div class="name">Epsilon</div><div class="desc">Empty string / free move</div><div class="eg">ε matches ""</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Main Grid: Graph + Table ── -->
+  <div class="main-grid">
+    <!-- Graph -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Automaton Visualization</h2>
+          <p>Click any state to inspect its ε-closure</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:var(--muted);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="animToggle" checked onchange="toggleAnim(this)" style="accent-color:#6d28d9;width:14px;height:14px;">
+            Animations
+          </label>
+          <div class="legend">
+            <span><i class="dot dot-start"></i> Start</span>
+            <span><i class="dot dot-accept"></i> Accept</span>
+            <span><i class="dot dot-epsilon"></i> ε-transition</span>
+          </div>
+        </div>
+      </div>
+      <div id="closure-bar" class="closure-bar">
+        <span class="cl-label">ε-closure:</span>
+        <div class="closure-states" id="closureStates"></div>
+        <span class="closure-hint">Click another state or click again to dismiss</span>
+      </div>
+      <div id="canvas-area">
+        <div class="canvas-card" id="canvasCard">
+          <div class="canvas-placeholder" id="canvasPlaceholder">
+            <div class="ph-icon">⬡</div>
+            Enter a regular expression above and click <strong>Build NFA</strong> to generate the automaton diagram.
+          </div>
+          <canvas id="c"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Transition Table</h2>
+          <p>Click a state row to highlight its ε-closure</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-shell" id="table-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── String Tester ── -->
+  <section class="panel">
+    <div class="tester-panel">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;margin-bottom:4px;">🧪 String Acceptance Tester</h2>
+        <p style="font-size:0.82rem;color:var(--muted);">Test whether a string is accepted by the NFA. Step through the simulation to see active states at each character.</p>
+      </div>
+      <div class="tester-grid">
+        <div class="input-wrap">
+          <label for="testStr">Test String (leave empty to test ε)</label>
+          <input id="testStr" type="text" placeholder="e.g. ab or abcbc" autocomplete="off" spellcheck="false" />
+        </div>
+        <button class="btn btn-primary" onclick="runTest()" style="padding:12px 18px;font-size:0.88rem;">Test</button>
+      </div>
+      <div class="result-box" id="resultBox">
+        <div class="result-header" id="resultHeader">
+          <span class="result-icon" id="resultIcon"></span>
+          <div>
+            <div id="resultTitle" style="font-size:1rem;"></div>
+            <div id="resultSubtitle" style="font-size:0.8rem;opacity:0.75;margin-top:2px;"></div>
+          </div>
+        </div>
+        <div class="trace-area">
+          <div class="trace-controls">
+            <button class="btn-sm" id="btnPrev" onclick="traceStep(-1)" disabled>◀ Prev</button>
+            <button class="btn-sm" id="btnNext" onclick="traceStep(1)" disabled>Next ▶</button>
+            <span class="step-indicator" id="stepIndicator">Step 0 / 0</span>
+            <span style="font-size:0.78rem;color:var(--muted);margin-left:auto">Active states highlighted in diagram</span>
+          </div>
+          <div class="trace-steps" id="traceSteps"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DFA Conversion & Simulation ── -->
+  <div class="panel dfa-section" id="dfaSection">
+    <div class="dfa-header-row">
+      <div>
+        <h2>🔄 ε-NFA → Minimized DFA</h2>
+        <p>Subset Construction + Hopcroft's algorithm — produces the minimal equivalent DFA</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <span class="dfa-badge" id="dfaStateBadge">No DFA yet</span>
+        <button class="btn btn-primary" onclick="convertToDFA()" id="btnConvert" disabled style="font-size:0.88rem;padding:10px 18px;">⚙ Convert to DFA</button>
+      </div>
+    </div>
+
+    <div id="dfaPlaceholderMsg" style="padding:14px 24px 10px;">
+      <p style="font-size:0.83rem;color:var(--muted);line-height:1.65;">
+        Build an ε-NFA first, then click <strong>Convert to DFA</strong> to run the <em>Subset Construction</em> algorithm.
+        Each DFA state corresponds to a <strong>set of NFA states</strong> (after ε-closure). The DFA is fully deterministic — exactly one transition per symbol per state.
+      </p>
+    </div>
+
+    <!-- DFA diagram -->
+    <div id="dfaDiagramArea" style="display:none;">
+      <div class="dfa-legend">
+        <span><i class="dot dot-dfa-start" style="width:9px;height:9px;border-radius:50%;display:inline-block;"></i> Start</span>
+        <span><i class="dot dot-dfa-accept" style="width:9px;height:9px;border-radius:50%;display:inline-block;"></i> Accept</span>
+        <span><i class="dot dot-dfa-trap" style="width:9px;height:9px;border-radius:50%;display:inline-block;"></i> Trap/Dead</span>
+        <span><i class="dot dot-dfa-normal" style="width:9px;height:9px;border-radius:50%;display:inline-block;"></i> Normal</span>
+        <span style="color:var(--muted);font-size:0.75rem;margin-left:4px;">Each DFA state label shows its NFA state subset</span>
+      </div>
+      <div class="dfa-canvas-card">
+        <div class="dfa-placeholder" id="dfaCanvasPlaceholder" style="display:none;">
+          <div class="ph-icon">⬡</div>DFA will appear here after conversion.
+        </div>
+        <canvas id="dfaCanvas"></canvas>
+      </div>
+      <div class="dfa-stats-row" id="dfaStatsRow">
+        <div class="dfa-stat"><div class="label">DFA States</div><div class="value" id="dfaStateCount">0</div></div>
+        <div class="dfa-stat"><div class="label">DFA Transitions</div><div class="value" id="dfaEdgeCount">0</div></div>
+        <div class="dfa-stat"><div class="label">Accept States</div><div class="value" id="dfaAcceptCount">0</div></div>
+      </div>
+    </div>
+
+    <!-- NFA vs DFA comparison -->
+    <div id="dfaCompare" style="display:none;">
+      <div class="compare-panel">
+        <div class="compare-title">ε-NFA vs DFA — Key Differences</div>
+        <div class="compare-grid">
+          <div class="compare-col nfa-col">
+            <h4>ε-NFA (original)</h4>
+            <ul id="nfaCompareList"></ul>
+          </div>
+          <div class="compare-col dfa-col">
+            <h4>DFA (converted)</h4>
+            <ul id="dfaCompareList"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step-wise DFA Construction ── -->
+    <div id="dfaStepsSection" style="display:none;padding:0 0 4px;">
+      <div class="dfa-steps-panel">
+        <div class="dfa-steps-header" id="dfaStepsToggle" onclick="toggleDFASteps()">
+          <div>
+            <h3>🔬 Step-wise Construction</h3>
+            <p>Walk through each BFS step of Subset Construction — see exactly how each DFA state is born</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="phase-badge subset" id="stepPhaseBadge">Subset Construction</span>
+            <span style="color:var(--muted);font-size:1rem;" id="stepsChevron">▼</span>
+          </div>
+        </div>
+
+        <div class="dfa-steps-body" id="dfaStepsBody">
+          <!-- Left: textual log -->
+          <div class="dfa-step-log" id="dfaStepLog"></div>
+
+          <!-- Right: partial DFA canvas + controls -->
+          <div class="dfa-step-canvas-wrap">
+            <div class="dfa-step-canvas-head">
+              <span><strong id="dfaStepStateInfo">—</strong></span>
+              <span id="dfaStepQueueInfo" style="font-size:0.75rem;"></span>
+            </div>
+            <div style="overflow:auto;flex:1;min-height:320px;display:flex;align-items:center;justify-content:center;padding:12px;">
+              <canvas id="dfaStepCanvas"></canvas>
+            </div>
+            <div class="dfa-steps-controls">
+              <button class="btn-sm" id="btnStepFirst"  onclick="gotoConstructionStep(0)" disabled>⏮ First</button>
+              <button class="btn-sm" id="btnStepBack"   onclick="constructionStepNav(-1)" disabled>◀ Back</button>
+              <button class="btn-sm" id="btnStepFwd"    onclick="constructionStepNav(1)"  disabled>Next ▶</button>
+              <button class="btn-sm" id="btnStepLast"   onclick="gotoConstructionStep(999999)" disabled>Last ⏭</button>
+              <button class="btn-sm" id="btnStepAuto"   onclick="toggleConstructionAuto()" disabled>⏵ Auto</button>
+              <span class="dfa-steps-indicator" id="dfaStepsIndicator">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DFA transition table -->
+    <div id="dfaTableArea" style="display:none;">
+      <div style="padding: 0 24px 8px; font-size:0.82rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">DFA Transition Table</div>
+      <div class="dfa-table-shell" id="dfaTableContainer"></div>
+    </div>
+
+    <!-- DFA Simulator -->
+    <div class="panel" id="dfaSimPanel" style="display:none;margin:0 0 4px;">
+      <div class="dfa-sim-panel">
+        <div>
+          <h2 style="font-size:1rem;font-weight:700;margin-bottom:4px;">🎮 DFA String Simulator</h2>
+          <p style="font-size:0.82rem;color:var(--muted);">Simulate input strings on the DFA step by step. The DFA always has exactly one active state.</p>
+        </div>
+        <div class="dfa-sim-grid">
+          <div class="input-wrap">
+            <label for="dfaSimStr">Input string to simulate (leave empty to test ε)</label>
+            <input id="dfaSimStr" type="text" placeholder="e.g. ab or abcbc" autocomplete="off" spellcheck="false" />
+          </div>
+          <button class="btn btn-primary" onclick="runDFASim()" style="padding:12px 18px;font-size:0.88rem;">▶ Simulate</button>
+          <button class="btn btn-secondary" onclick="autoPlayDFA()" id="btnDFAPlay" style="padding:12px 14px;font-size:0.88rem;" title="Auto-play">⏵</button>
+        </div>
+
+        <div id="dfaSimResult" style="display:none;"></div>
+
+        <!-- Input tape -->
+        <div class="tape-wrap" id="tapeWrap" style="display:none;">
+          <div class="tape-label">Input Tape</div>
+          <div class="tape-cells" id="tapeCells"></div>
+        </div>
+
+        <!-- Sim controls + steps -->
+        <div id="dfaSimControls" style="display:none;">
+          <div class="trace-controls">
+            <button class="btn-sm" id="btnDFAPrev" onclick="dfaSimStep(-1)" disabled>◀ Prev</button>
+            <button class="btn-sm" id="btnDFANext" onclick="dfaSimStep(1)" disabled>Next ▶</button>
+            <span class="step-indicator" id="dfaStepIndicator">Step 0 / 0</span>
+            <span style="font-size:0.78rem;color:var(--muted);margin-left:auto">Active DFA state highlighted in diagram above</span>
+          </div>
+          <div class="dfa-sim-steps" id="dfaSimSteps"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step-by-step + Parse Tree ── -->
+  <div class="main-grid">
+    <div class="panel">
+      <div class="step-panel">
+        <div>
+          <h2 style="font-size:1rem;font-weight:700;margin-bottom:4px;">🪜 Construction Walkthrough</h2>
+          <p style="font-size:0.82rem;color:var(--muted);">Step through how Thompson's algorithm assembles the NFA piece by piece.</p>
+        </div>
+        <div class="construction-controls">
+          <button class="btn-sm" id="btnStepPrev" onclick="constructionStep(-1)" disabled style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--sans);transition:0.15s;">◀ Back</button>
+          <button class="btn-sm" id="btnStepNext" onclick="constructionStep(1)" disabled style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--sans);transition:0.15s;">Next ▶</button>
+          <span class="step-count-badge" id="constructionBadge">Build an NFA first</span>
+        </div>
+        <div class="step-log" id="stepLog">
+          <div class="step-log-entry"><span class="sl-num"></span><span style="color:var(--muted);font-style:italic;font-size:0.82rem">Construction steps will appear here after you build an NFA.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="step-panel">
+        <div>
+          <h2 style="font-size:1rem;font-weight:700;margin-bottom:4px;">📊 Parse Tree</h2>
+          <p style="font-size:0.82rem;color:var(--muted);">Structural decomposition of your regular expression.</p>
+        </div>
+        <div class="parse-tree-area" id="parseTreeArea">
+          <span class="pt-placeholder">Parse tree will appear here after building an NFA.</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-cat" style="font-size:0.7rem">CAT</span> Concatenation</span>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-uni" style="font-size:0.7rem">UNION</span> Alternation</span>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-star" style="font-size:0.7rem">STAR</span> Kleene *</span>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-plus" style="font-size:0.7rem">PLUS</span> One or more</span>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-opt" style="font-size:0.7rem">OPT</span> Optional</span>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:5px;color:var(--muted)"><span class="pt-label op-char" style="font-size:0.7rem">'a'</span> Character</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Export / Notes ── -->
+  <section class="panel">
+    <div class="export-bar">
+      <div class="notes-wrap">
+        <label style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">🗒 Study Notes</label>
+        <textarea id="notes" placeholder="Jot down observations, questions, or insights about this automaton…"></textarea>
+      </div>
+      <div class="export-btns">
+        <button class="btn btn-secondary" onclick="downloadCanvas()" style="font-size:0.85rem;padding:10px 16px;">⬇ Save Diagram (PNG)</button>
+        <button class="btn btn-secondary" onclick="copyNotes()" style="font-size:0.85rem;padding:10px 16px;">📋 Copy Notes</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">Regex → ε-NFA Visualizer · Student Edition · Thompson's Construction</div>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────
+  // NFA Builder (Thompson's Construction)
+  // ─────────────────────────────────────────────
+  const DPR = window.devicePixelRatio || 1;
+  let sc = 0;
+  const ns = () => sc++;
+
+  // Global state
+  let currentNFA = null;
+  let currentDFA = null;         // converted DFA object
+  let dfaSimData = [];           // simulation steps
+  let dfaSimIdx = 0;
+  let dfaHighlighted = null;     // currently highlighted DFA state id
+  let dfaStatePositions = new Map();
+  let dfaAnimRAF = null;
+  let dfaAnimState = null;
+  let dfaPulseT = 0;
+  let constructionLog = [];
+  let constructionStep_ = 0;
+  let traceData = [];
+  let traceIdx = 0;
+  let highlightedStates = new Set();
+  let selectedState = null;
+  let statePositions = new Map();
+
+  function addT(m, f, t, l) {
+    if (!m.has(f)) m.set(f, []);
+    m.get(f).push({ to: t, label: l });
+  }
+  function merge(a, b) {
+    for (const [f, es] of b) {
+      if (!a.has(f)) a.set(f, []);
+      a.get(f).push(...es);
+    }
+  }
+  const mk = (s, a, t, tag) => ({ s, a, t, tag });
+
+  function charNFA(c) {
+    const s = ns(), a = ns(), t = new Map();
+    addT(t, s, a, c);
+    const nfa = mk(s, a, t, `char_${c}`);
+    logStep('char', `Create NFA for character <strong>'${c}'</strong>: states q${s}→q${a}`, s, a);
+    return nfa;
+  }
+  function cat(n1, n2) {
+    const t = new Map();
+    merge(t, n1.t); merge(t, n2.t);
+    addT(t, n1.a, n2.s, 'ε');
+    const nfa = mk(n1.s, n2.a, t, 'cat');
+    logStep('cat', `Concatenate: connect q${n1.a} →ε→ q${n2.s}. Start=q${n1.s}, Accept=q${n2.a}`, n1.s, n2.a);
+    return nfa;
+  }
+  function uni(n1, n2) {
+    const s = ns(), a = ns(), t = new Map();
+    merge(t, n1.t); merge(t, n2.t);
+    addT(t, s, n1.s, 'ε'); addT(t, s, n2.s, 'ε');
+    addT(t, n1.a, a, 'ε'); addT(t, n2.a, a, 'ε');
+    const nfa = mk(s, a, t, 'uni');
+    logStep('uni', `Union: new start q${s} branches ε to q${n1.s} and q${n2.s}; both ends ε→ new accept q${a}`, s, a);
+    return nfa;
+  }
+  function kstar(n) {
+    const s = ns(), a = ns(), t = new Map();
+    merge(t, n.t);
+    addT(t, s, n.s, 'ε'); addT(t, s, a, 'ε');
+    addT(t, n.a, n.s, 'ε'); addT(t, n.a, a, 'ε');
+    const nfa = mk(s, a, t, 'star');
+    logStep('star', `Kleene *: new q${s}→ε→q${n.s} (or skip to q${a}), q${n.a}→ε→q${n.s} (loop), q${n.a}→ε→q${a}`, s, a);
+    return nfa;
+  }
+  function cln(n) {
+    const all = new Set([n.s, n.a]);
+    for (const [f, es] of n.t) { all.add(f); for (const e of es) all.add(e.to); }
+    const map = new Map();
+    for (const x of all) map.set(x, ns());
+    const t = new Map();
+    for (const [f, es] of n.t) {
+      for (const e of es) addT(t, map.get(f), map.get(e.to), e.label);
+    }
+    return mk(map.get(n.s), map.get(n.a), t, 'clone');
+  }
+  function plus(n) {
+    const cloned = cln(n);
+    const result = cat(n, kstar(cloned));
+    logStep('plus', `One-or-more (+): concatenate original with a Kleene * of a clone. Accept=q${result.a}`, result.s, result.a);
+    return result;
+  }
+  function opt(n) {
+    const s = ns(), a = ns(), t = new Map();
+    merge(t, n.t);
+    addT(t, s, n.s, 'ε'); addT(t, s, a, 'ε'); addT(t, n.a, a, 'ε');
+    const nfa = mk(s, a, t, 'opt');
+    logStep('opt', `Optional (?): q${s}→ε→q${n.s} or skip to q${a}. q${n.a}→ε→q${a}`, s, a);
+    return nfa;
+  }
+
+  function logStep(op, desc, startState, acceptState) {
+    constructionLog.push({ op, desc, startState, acceptState });
+  }
+
+  // ─── Parser (recursive descent) with parse-tree output ───
+  class Px {
+    constructor(src) { this.src = src; this.i = 0; }
+    peek() { return this.src[this.i]; }
+    eof() { return this.i >= this.src.length; }
+    eat(c) {
+      if (this.peek() !== c) throw new Error(`Expected '${c}' at pos ${this.i}`);
+      this.i++;
+    }
+    expr() {
+      let [n, t] = this.term();
+      while (!this.eof() && this.peek() === '|') {
+        this.i++;
+        const [n2, t2] = this.term();
+        n = uni(n, n2);
+        t = { op: 'UNION', children: [t, t2] };
+      }
+      return [n, t];
+    }
+    term() {
+      const stop = new Set(['|', ')']);
+      let n = null, t = null;
+      while (!this.eof() && !stop.has(this.peek())) {
+        const [f, ft] = this.factor();
+        if (n) { n = cat(n, f); t = { op: 'CAT', children: [t, ft] }; }
+        else { n = f; t = ft; }
+      }
+      if (!n) { n = charNFA('ε'); t = { op: 'CHAR', val: 'ε' }; }
+      return [n, t];
+    }
+    factor() {
+      let [a, at] = this.atom();
+      while (!this.eof() && '*+?'.includes(this.peek())) {
+        const op = this.src[this.i++];
+        if (op === '*') { a = kstar(a); at = { op: 'STAR', children: [at] }; }
+        else if (op === '+') { a = plus(a); at = { op: 'PLUS', children: [at] }; }
+        else { a = opt(a); at = { op: 'OPT', children: [at] }; }
+      }
+      return [a, at];
+    }
+    atom() {
+      const c = this.peek();
+      if (c === '(') {
+        this.i++;
+        const [n, t] = this.expr();
+        this.eat(')');
+        return [n, t];
+      }
+      if (c === '[') return this.cls();
+      if (c === 'ε') { this.i++; return [charNFA('ε'), { op: 'CHAR', val: 'ε' }]; }
+      if (!c || '|)*+?'.includes(c)) throw new Error(`Unexpected '${c || 'end'}' at pos ${this.i}`);
+      this.i++;
+      return [charNFA(c), { op: 'CHAR', val: c }];
+    }
+    cls() {
+      this.eat('[');
+      const chars = [];
+      while (!this.eof() && this.peek() !== ']') {
+        const a = this.src[this.i++];
+        if (!this.eof() && this.peek() === '-' && this.src[this.i + 1] !== ']') {
+          this.i++;
+          const b = this.src[this.i++];
+          for (let cc = a.charCodeAt(0); cc <= b.charCodeAt(0); cc++) chars.push(String.fromCharCode(cc));
+        } else { chars.push(a); }
+      }
+      this.eat(']');
+      if (!chars.length) throw new Error('Empty character class []');
+      let n = charNFA(chars[0]);
+      let t = { op: 'CHAR', val: chars[0] };
+      for (let k = 1; k < chars.length; k++) {
+        n = uni(n, charNFA(chars[k]));
+        t = { op: 'UNION', children: [t, { op: 'CHAR', val: chars[k] }] };
+      }
+      return [n, t];
+    }
+  }
+
+  let parseTree = null;
+
+  function parseRE(re) {
+    sc = 0;
+    constructionLog = [];
+    if (!re.trim()) throw new Error('Empty expression');
+    const p = new Px(re.trim());
+    const [n, t] = p.expr();
+    if (!p.eof()) throw new Error(`Unexpected '${p.peek()}' at pos ${p.i}`);
+    parseTree = t;
+    return n;
+  }
+
+  // ─────────────────────────────────────────────
+  // Layout
+  // ─────────────────────────────────────────────
+  function layout(nfa) {
+    const all = new Set([nfa.s, nfa.a]);
+    for (const [f, es] of nfa.t) { all.add(f); for (const e of es) all.add(e.to); }
+    const adj = new Map();
+    for (const s of all) adj.set(s, []);
+    for (const [f, es] of nfa.t) for (const e of es) adj.get(f).push(e.to);
+    const level = new Map();
+    const q = [nfa.s];
+    level.set(nfa.s, 0);
+    while (q.length) {
+      const u = q.shift();
+      for (const v of adj.get(u) || []) {
+        if (!level.has(v)) { level.set(v, level.get(u) + 1); q.push(v); }
+      }
+    }
+    // place unreachable states
+    for (const s of all) if (!level.has(s)) level.set(s, 0);
+    const groups = new Map();
+    for (const [s, l] of level) { if (!groups.has(l)) groups.set(l, []); groups.get(l).push(s); }
+    const HG = 148, VG = 104;
+    const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
+    const pos = new Map();
+    let x = 100;
+    for (const [, nodes] of sorted) {
+      const totalH = (nodes.length - 1) * VG;
+      nodes.forEach((s, i) => pos.set(s, { x, y: 220 + i * VG - totalH / 2 }));
+      x += HG;
+    }
+    const maxNodes = sorted.reduce((m, [, ns]) => Math.max(m, ns.length), 1);
+    return { pos, W: Math.max(860, x + 100), H: Math.max(520, 250 + maxNodes * VG) };
+  }
+
+  // ─────────────────────────────────────────────
+  // Drawing
+  // ─────────────────────────────────────────────
+  function arrowHead(ctx, x, y, ux, uy, color) {
+    const sz = 10;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - sz * ux + sz * 0.42 * uy, y - sz * uy - sz * 0.42 * ux);
+    ctx.lineTo(x - sz * ux - sz * 0.42 * uy, y - sz * uy + sz * 0.42 * ux);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // drawArrow is now handled by drawArrowAlpha inside drawScene
+
+  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    if (fill) ctx.fill(); if (stroke) ctx.stroke();
+  }
+
+  // ─────────────────────────────────────────────
+  // Animation engine
+  // ─────────────────────────────────────────────
+  let animRAF = null;           // current requestAnimationFrame handle
+  let animState = null;         // what animation is running: 'build' | 'trace' | 'closure' | null
+  let animProgress = {};        // per-element alpha/phase values
+  let tokenParticles = [];      // moving token blobs during trace
+  let closureRipples = [];      // ripple rings during ε-closure animation
+  let pulseStates = new Set();  // states pulsing during trace step
+  let pulseT = 0;               // global pulse timer
+
+  function cancelAnim() {
+    if (animRAF) { cancelAnimationFrame(animRAF); animRAF = null; }
+    animState = null;
+    tokenParticles = [];
+    closureRipples = [];
+  }
+
+  // ── Draw helpers (alpha-aware versions) ──────
+
+  function drawStateAlpha(ctx, x, y, id, isS, isA, highlighted, alpha, pulse) {
+    const R = 28;
+    ctx.globalAlpha = alpha;
+    let fill, stroke;
+    if (highlighted) {
+      const glow = pulse ? 0.28 + 0.18 * Math.sin(pulseT * 4) : 0.28;
+      fill = `rgba(245,158,11,${glow})`;
+      stroke = '#f59e0b';
+    } else if (isA) {
+      fill = 'rgba(16,185,129,0.16)'; stroke = '#10b981';
+    } else {
+      fill = 'rgba(255,255,255,0.06)'; stroke = isS ? '#0891b2' : '#dbeafe';
+    }
+
+    // glow halo for highlighted states
+    if (highlighted && pulse) {
+      const glowR = R + 10 + 6 * Math.sin(pulseT * 4);
+      const grad = ctx.createRadialGradient(x, y, R - 2, x, y, glowR);
+      grad.addColorStop(0, 'rgba(245,158,11,0.35)');
+      grad.addColorStop(1, 'rgba(245,158,11,0)');
+      ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = grad; ctx.fill();
+    }
+
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = highlighted && pulse ? 3 : 2.5;
+    ctx.fill(); ctx.stroke();
+    if (isA) {
+      ctx.beginPath(); ctx.arc(x, y, R - 6, 0, Math.PI * 2);
+      ctx.strokeStyle = highlighted ? '#f59e0b' : '#10b981'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    if (isS) {
+      ctx.strokeStyle = highlighted ? '#f59e0b' : '#0891b2'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(x - R - 28, y); ctx.lineTo(x - R - 4, y); ctx.stroke();
+      arrowHead(ctx, x - R - 4, y, 1, 0, highlighted ? '#f59e0b' : '#0891b2');
+    }
+    ctx.font = '700 12px JetBrains Mono, monospace';
+    ctx.fillStyle = highlighted ? '#fcd34d' : '#f0f8ff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('q' + id, x, y);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawArrowAlpha(ctx, x1, y1, x2, y2, label, isEps, curve, alpha, lit) {
+    ctx.globalAlpha = alpha;
+    const baseColor = isEps ? '#f59e0b' : '#93c5fd';
+    const color = lit ? (isEps ? '#fde68a' : '#bfdbfe') : baseColor;
+    const R = 28;
+    ctx.lineWidth = lit ? 3 : 2;
+    ctx.strokeStyle = color;
+    ctx.setLineDash(isEps ? [7, 5] : []);
+
+    const dx = x2 - x1, dy = y2 - y1;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    let lx, ly;
+
+    if (x1 === x2 && y1 === y2) {
+      ctx.beginPath(); ctx.arc(x1, y1 - R - 18, 15, Math.PI * 0.25, Math.PI * 2.82); ctx.stroke();
+      const ex = x1 + Math.sin(Math.PI * 0.25) * 15, ey = y1 - R - 18 + Math.cos(Math.PI * 0.25) * 15;
+      arrowHead(ctx, ex, ey, 0.95, 0.3, color); lx = x1 + 26; ly = y1 - R - 36;
+    } else if (curve) {
+      const px = -uy, py = ux;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const bend = d * 0.24 * curve;
+      const cx = mx + px * bend, cy = my + py * bend;
+      const sx = x1 + ux * R, sy = y1 + uy * R;
+      const ex = x2 - ux * R, ey = y2 - uy * R;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(cx, cy, ex, ey); ctx.stroke();
+      const tl = Math.sqrt((ex - cx) ** 2 + (ey - cy) ** 2) || 1;
+      arrowHead(ctx, ex, ey, (ex - cx) / tl, (ey - cy) / tl, color);
+      lx = 0.25 * sx + 0.5 * cx + 0.25 * ex; ly = 0.25 * sy + 0.5 * cy + 0.25 * ey;
+    } else {
+      const sx = x1 + ux * R, sy = y1 + uy * R;
+      const ex = x2 - ux * R, ey = y2 - uy * R;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      arrowHead(ctx, ex, ey, ux, uy, color);
+      lx = (sx + ex) / 2 - uy * 12; ly = (sy + ey) / 2 + ux * 12;
+    }
+    ctx.setLineDash([]);
+    if (label) {
+      ctx.font = '600 12px JetBrains Mono, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(label).width + 16;
+      ctx.fillStyle = 'rgba(10,15,30,0.94)';
+      roundRect(ctx, lx - tw / 2, ly - 11, tw, 22, 8, true, false);
+      ctx.fillStyle = color;
+      ctx.fillText(label, lx, ly + 0.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Core scene renderer (used by all animation modes) ──
+
+  function drawScene(nfa, pos, alphaMap, litEdges) {
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = parseInt(canvas.style.width), H = parseInt(canvas.style.height);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const all = new Set([nfa.s, nfa.a]);
+    for (const [f, es] of nfa.t) { all.add(f); for (const e of es) all.add(e.to); }
+
+    // draw edges
+    const drawn = new Map();
+    for (const [from, es] of nfa.t) {
+      const p1 = pos.get(from); if (!p1) continue;
+      const byDest = new Map();
+      for (const e of es) { if (!byDest.has(e.to)) byDest.set(e.to, []); byDest.get(e.to).push(e.label); }
+      for (const [to, labs] of byDest) {
+        const p2 = pos.get(to); if (!p2) continue;
+        const key = `${from}-${to}`, revKey = `${to}-${from}`;
+        let curve = 0;
+        if (from !== to) { const hasRev = nfa.t.has(to) && nfa.t.get(to).some(e => e.to === from); if (hasRev) curve = drawn.has(revKey) ? 1 : 0.8; }
+        const isEps = labs.every(l => l === 'ε');
+        const edgeKey = `${from}-${to}`;
+        const alpha = alphaMap.edges ? (alphaMap.edges.get(edgeKey) ?? 1) : 1;
+        const lit = litEdges && litEdges.has(edgeKey);
+        drawArrowAlpha(ctx, p1.x, p1.y, p2.x, p2.y, labs.join(','), isEps, curve, alpha, lit);
+        drawn.set(key, 1);
+      }
+    }
+
+    // draw token particles (string trace)
+    for (const p of tokenParticles) {
+      ctx.globalAlpha = p.alpha;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14);
+      grad.addColorStop(0, 'rgba(167,243,208,0.95)');
+      grad.addColorStop(0.5, 'rgba(16,185,129,0.6)');
+      grad.addColorStop(1, 'rgba(16,185,129,0)');
+      ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // draw ε-closure ripple rings
+    for (const r of closureRipples) {
+      ctx.globalAlpha = r.alpha * (1 - r.t);
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.t * 50 + 28, 0, Math.PI * 2);
+      ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // draw states on top
+    for (const s of all) {
+      const p = pos.get(s); if (!p) continue;
+      const alpha = alphaMap.states ? (alphaMap.states.get(s) ?? 1) : 1;
+      const isHighlighted = highlightedStates.has(s);
+      const isPulsing = pulseStates.has(s);
+      drawStateAlpha(ctx, p.x, p.y, s, s === nfa.s, s === nfa.a, isHighlighted, alpha, isPulsing);
+    }
+  }
+
+  // ── Animation 1: Build Reveal ─────────────────
+  // States and edges fade in staggered left-to-right
+
+  function animateBuild(nfa) {
+    cancelAnim();
+    animState = 'build';
+    pulseStates = new Set();
+    highlightedStates = new Set();
+
+    const { pos, W, H } = layout(nfa);
+    statePositions = pos;
+    const canvas = document.getElementById('c');
+    document.getElementById('canvasPlaceholder').style.display = 'none';
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+    // build ordered list of states by x position (left → right)
+    const all = new Set([nfa.s, nfa.a]);
+    for (const [f, es] of nfa.t) { all.add(f); for (const e of es) all.add(e.to); }
+    const stateOrder = [...all].sort((a, b) => (pos.get(a)?.x ?? 0) - (pos.get(b)?.x ?? 0));
+
+    // build ordered list of edges
+    const edgeOrder = [];
+    const drawn = new Map();
+    for (const [from, es] of nfa.t) {
+      const byDest = new Map();
+      for (const e of es) { if (!byDest.has(e.to)) byDest.set(e.to, []); byDest.get(e.to).push(e.label); }
+      for (const [to] of byDest) {
+        const key = `${from}-${to}`;
+        if (!drawn.has(key)) { edgeOrder.push(key); drawn.set(key, 1); }
+      }
+    }
+
+    const stateAlpha = new Map();
+    const edgeAlpha = new Map();
+    for (const s of all) stateAlpha.set(s, 0);
+    for (const k of edgeOrder) edgeAlpha.set(k, 0);
+
+    const totalItems = stateOrder.length + edgeOrder.length;
+    const DURATION = Math.min(1800, 300 + totalItems * 80); // ms
+    const start = performance.now();
+
+    function tick(now) {
+      if (animState !== 'build') return;
+      const elapsed = now - start;
+      const t = Math.min(elapsed / DURATION, 1);
+
+      // stagger each state in at its own threshold
+      stateOrder.forEach((s, i) => {
+        const threshold = (i / Math.max(stateOrder.length - 1, 1)) * 0.7;
+        const local = Math.max(0, (t - threshold) / 0.3);
+        stateAlpha.set(s, Math.min(1, easeOut(local)));
+      });
+      edgeOrder.forEach((k, i) => {
+        const threshold = 0.2 + (i / Math.max(edgeOrder.length - 1, 1)) * 0.6;
+        const local = Math.max(0, (t - threshold) / 0.4);
+        edgeAlpha.set(k, Math.min(1, easeOut(local)));
+      });
+
+      drawScene(nfa, pos, { states: stateAlpha, edges: edgeAlpha }, null);
+
+      if (t < 1) { animRAF = requestAnimationFrame(tick); }
+      else { animState = null; render(nfa); }
+    }
+    animRAF = requestAnimationFrame(tick);
+  }
+
+  // ── Animation 2: Token/State Pulse (string trace step) ──
+
+  function animateTraceStep(nfa, activeStates, litEdgeKeys) {
+    cancelAnim();
+    animState = 'trace';
+    pulseT = 0;
+    pulseStates = new Set(activeStates);
+    highlightedStates = new Set(activeStates);
+
+    const { pos } = layout(nfa);
+    const litEdges = new Set(litEdgeKeys);
+
+    // Spawn token particles along each lit edge
+    tokenParticles = [];
+    for (const key of litEdgeKeys) {
+      const [from, to] = key.split('-').map(Number);
+      const p1 = pos.get(from), p2 = pos.get(to);
+      if (!p1 || !p2) continue;
+      tokenParticles.push({ from, to, progress: 0, x: p1.x, y: p1.y, alpha: 1, p1, p2, speed: 0.018 + Math.random() * 0.01 });
+    }
+
+    const start = performance.now();
+    const PULSE_DURATION = 900; // ms for the pulse halo
+
+    function tick(now) {
+      if (animState !== 'trace') return;
+      const elapsed = now - start;
+      pulseT = elapsed / 1000;
+
+      // move tokens
+      let anyMoving = false;
+      for (const tok of tokenParticles) {
+        tok.progress = Math.min(1, tok.progress + tok.speed);
+        const t = easeInOut(tok.progress);
+        tok.x = tok.p1.x + (tok.p2.x - tok.p1.x) * t;
+        tok.y = tok.p1.y + (tok.p2.y - tok.p1.y) * t;
+        tok.alpha = tok.progress < 0.85 ? 1 : 1 - (tok.progress - 0.85) / 0.15;
+        if (tok.progress < 1) anyMoving = true;
+      }
+      tokenParticles = tokenParticles.filter(t => t.progress < 1);
+
+      drawScene(nfa, pos, {}, litEdges);
+
+      if (anyMoving || elapsed < PULSE_DURATION) {
+        animRAF = requestAnimationFrame(tick);
+      } else {
+        animState = null;
+        tokenParticles = [];
+        render(nfa);
+      }
+    }
+    animRAF = requestAnimationFrame(tick);
+  }
+
+  // ── Animation 3: ε-Closure Ripple ────────────
+
+  function animateClosureRipple(nfa, clickedState, closureSet) {
+    cancelAnim();
+    animState = 'closure';
+    highlightedStates = new Set(closureSet);
+    pulseStates = new Set(closureSet);
+    pulseT = 0;
+
+    const { pos } = layout(nfa);
+    closureRipples = [];
+
+    // BFS to find ε-path order from clicked state
+    const rippleOrder = [clickedState];
+    const visited = new Set([clickedState]);
+    const queue = [clickedState];
+    while (queue.length) {
+      const s = queue.shift();
+      if (nfa.t.has(s)) for (const e of nfa.t.get(s)) {
+        if (e.label === 'ε' && !visited.has(e.to)) {
+          visited.add(e.to); queue.push(e.to); rippleOrder.push(e.to);
+        }
+      }
+    }
+
+    const start = performance.now();
+    const RIPPLE_STAGGER = 120; // ms between ripples
+    const RIPPLE_DURATION = 600;
+
+    function tick(now) {
+      if (animState !== 'closure') return;
+      const elapsed = now - start;
+      pulseT = elapsed / 1000;
+
+      // spawn and update ripples
+      rippleOrder.forEach((s, i) => {
+        const spawnAt = i * RIPPLE_STAGGER;
+        if (elapsed >= spawnAt) {
+          const localT = (elapsed - spawnAt) / RIPPLE_DURATION;
+          if (localT <= 1) {
+            const p = pos.get(s);
+            if (p) closureRipples.push({ x: p.x, y: p.y, t: easeOut(localT), alpha: 1 - localT * 0.8 });
+          }
+        }
+      });
+
+      drawScene(nfa, pos, {}, null);
+      closureRipples = [];
+
+      const done = elapsed > rippleOrder.length * RIPPLE_STAGGER + RIPPLE_DURATION + 400;
+      if (!done) {
+        // re-queue ripples for this frame
+        rippleOrder.forEach((s, i) => {
+          const spawnAt = i * RIPPLE_STAGGER;
+          if (elapsed >= spawnAt) {
+            const localT = (elapsed - spawnAt) / RIPPLE_DURATION;
+            if (localT <= 1) {
+              const p = pos.get(s);
+              if (p) closureRipples.push({ x: p.x, y: p.y, t: easeOut(localT), alpha: 1 - localT * 0.8 });
+            }
+          }
+        });
+        animRAF = requestAnimationFrame(tick);
+      } else {
+        animState = null;
+        closureRipples = [];
+        render(nfa);
+      }
+    }
+    animRAF = requestAnimationFrame(tick);
+  }
+
+  // ── Easing helpers ───────────────────────────
+  function easeOut(t) { return 1 - (1 - t) ** 3; }
+  function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; }
+
+  // ── Static render (no animation) ─────────────
+  function drawState(ctx, x, y, id, isS, isA, highlighted) {
+    drawStateAlpha(ctx, x, y, id, isS, isA, highlighted, 1, false);
+  }
+
+  function render(nfa) {
+    cancelAnim();
+    const { pos, W, H } = layout(nfa);
+    statePositions = pos;
+    const canvas = document.getElementById('c');
+    document.getElementById('canvasPlaceholder').style.display = 'none';
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    drawScene(nfa, pos, {}, null);
+  }
+
+  // ─────────────────────────────────────────────
+  // Epsilon Closure
+  // ─────────────────────────────────────────────
+  function epsilonClosure(nfa, states) {
+    const visited = new Set(states);
+    const stack = [...states];
+    while (stack.length) {
+      const s = stack.pop();
+      if (nfa.t.has(s)) for (const e of nfa.t.get(s)) {
+        if (e.label === 'ε' && !visited.has(e.to)) { visited.add(e.to); stack.push(e.to); }
+      }
+    }
+    return visited;
+  }
+
+  // ─────────────────────────────────────────────
+  // Canvas click → ε-closure inspector
+  // ─────────────────────────────────────────────
+  document.getElementById('c').addEventListener('click', function(e) {
+    if (!currentNFA) return;
+    const rect = this.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (this.width / (DPR * rect.width));
+    const my = (e.clientY - rect.top) * (this.height / (DPR * rect.height));
+    let clicked = null;
+    for (const [id, pos] of statePositions) {
+      const dx = mx - pos.x, dy = my - pos.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= 28) { clicked = id; break; }
+    }
+    if (clicked === null) {
+      highlightedStates.clear(); selectedState = null;
+      document.getElementById('closure-bar').classList.remove('visible');
+      document.querySelector('.cl-label').textContent = 'ε-closure:';
+      render(currentNFA); return;
+    }
+    if (clicked === selectedState) {
+      highlightedStates.clear(); selectedState = null;
+      document.getElementById('closure-bar').classList.remove('visible');
+      document.querySelector('.cl-label').textContent = 'ε-closure:';
+      render(currentNFA); return;
+    }
+    selectedState = clicked;
+    const closure = epsilonClosure(currentNFA, [clicked]);
+    highlightedStates = closure;
+    animateClosureRipple(currentNFA, clicked, closure);  // ← ripple animation
+    const bar = document.getElementById('closure-bar');
+    document.querySelector('.cl-label').textContent = 'ε-closure:';
+    bar.classList.add('visible');
+    const cs = document.getElementById('closureStates');
+    cs.innerHTML = [...closure].sort((a,b)=>a-b).map(s =>
+      `<span class="closure-state">q${s}${s === currentNFA.s ? ' ▶' : ''}${s === currentNFA.a ? ' ★' : ''}</span>`
+    ).join('');
+  });
+
+  // ─────────────────────────────────────────────
+  // Transition Table
+  // ─────────────────────────────────────────────
+  function buildTable(nfa) {
+    const container = document.getElementById('table-container');
+    container.innerHTML = '';
+    const allStates = new Set([nfa.s, nfa.a]);
+    const symbols = new Set();
+    for (const [from, edges] of nfa.t) {
+      allStates.add(from);
+      for (const e of edges) { allStates.add(e.to); symbols.add(e.label); }
+    }
+    const states = Array.from(allStates).sort((a, b) => a - b);
+    const cols = Array.from(symbols);
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+    const header = document.createElement('tr');
+    header.innerHTML = `<th>State</th>` + cols.map(c => `<th>${c}</th>`).join('');
+    thead.appendChild(header);
+    for (const s of states) {
+      const row = document.createElement('tr');
+      const stateLabel = `${s === nfa.s ? '▶ ' : ''}${s === nfa.a ? '★ ' : ''}q${s}`;
+      let html = `<td class="clickable-state" data-state="${s}" title="Click to inspect ε-closure of q${s}">${stateLabel}</td>`;
+      for (const sym of cols) {
+        const targets = new Set();
+        const closure = epsilonClosure(nfa, [s]);
+        for (const cs of closure) {
+          if (nfa.t.has(cs)) for (const e of nfa.t.get(cs)) {
+            if (e.label === sym) { const nc = epsilonClosure(nfa, [e.to]); for (const ns of nc) targets.add(`q${ns}`); }
+          }
+        }
+        html += `<td>${targets.size ? Array.from(targets).join(', ') : '—'}</td>`;
+      }
+      row.innerHTML = html;
+      tbody.appendChild(row);
+    }
+    table.appendChild(thead); table.appendChild(tbody);
+    container.appendChild(table);
+
+    // click state in table → show closure
+    container.querySelectorAll('.clickable-state').forEach(td => {
+      td.addEventListener('click', () => {
+        if (!currentNFA) return;
+        const stateId = parseInt(td.dataset.state);
+        if (stateId === selectedState) {
+          highlightedStates.clear(); selectedState = null;
+          document.getElementById('closure-bar').classList.remove('visible');
+          container.querySelectorAll('tr').forEach(r => r.classList.remove('highlighted-row'));
+        } else {
+          selectedState = stateId;
+          const closure = epsilonClosure(currentNFA, [stateId]);
+          highlightedStates = closure;
+          container.querySelectorAll('tr').forEach(r => r.classList.remove('highlighted-row'));
+          td.parentElement.classList.add('highlighted-row');
+          const bar = document.getElementById('closure-bar');
+          bar.classList.add('visible');
+          const cs = document.getElementById('closureStates');
+          cs.innerHTML = [...closure].sort((a,b)=>a-b).map(s =>
+            `<span class="closure-state">q${s}${s === currentNFA.s ? ' ▶' : ''}${s === currentNFA.a ? ' ★' : ''}</span>`
+          ).join('');
+          animateClosureRipple(currentNFA, stateId, closure);  // ← ripple animation
+        }
+        render(currentNFA);
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Stats
+  // ─────────────────────────────────────────────
+  function updateStats(nfa) {
+    const states = new Set([nfa.s, nfa.a]);
+    const symbols = new Set();
+    let edgeCount = 0;
+    for (const [from, edges] of nfa.t) {
+      states.add(from); edgeCount += edges.length;
+      for (const e of edges) { states.add(e.to); if (e.label !== 'ε') symbols.add(e.label); }
+    }
+    document.getElementById('stateCount').textContent = states.size;
+    document.getElementById('edgeCount').textContent = edgeCount;
+    document.getElementById('symbolCount').textContent = symbols.size;
+    document.getElementById('startAccept').textContent = `q${nfa.s}→q${nfa.a}`;
+  }
+
+  // ─────────────────────────────────────────────
+  // String Acceptance Tester
+  // ─────────────────────────────────────────────
+  function runTest() {
+    if (!currentNFA) { alert('Build an NFA first!'); return; }
+    const str = document.getElementById('testStr').value;
+    const chars = str === '' ? [] : str.split('');
+    traceData = [];
+    traceIdx = 0;
+
+    // initial ε-closure
+    let current = epsilonClosure(currentNFA, [currentNFA.s]);
+    traceData.push({ char: null, label: 'Start', states: new Set(current), desc: `Initial ε-closure of start state q${currentNFA.s}` });
+
+    for (const ch of chars) {
+      // move on ch
+      const next = new Set();
+      for (const s of current) {
+        if (currentNFA.t.has(s)) for (const e of currentNFA.t.get(s)) {
+          if (e.label === ch) next.add(e.to);
+        }
+      }
+      // ε-closure
+      const after = epsilonClosure(currentNFA, [...next]);
+      traceData.push({ char: ch, states: new Set(after), desc: `Read '${ch}': move to {${[...next].map(s=>`q${s}`).join(', ')||'∅'}}, then ε-close` });
+      current = after;
+    }
+
+    const accepted = current.has(currentNFA.a);
+    const resultBox = document.getElementById('resultBox');
+    const resultHeader = document.getElementById('resultHeader');
+    resultHeader.className = 'result-header ' + (accepted ? 'accept' : 'reject');
+    document.getElementById('resultIcon').textContent = accepted ? '✓' : '✗';
+    document.getElementById('resultTitle').textContent = accepted
+      ? `"${str || 'ε'}" is ACCEPTED`
+      : `"${str || 'ε'}" is REJECTED`;
+    document.getElementById('resultSubtitle').textContent = accepted
+      ? `The accept state q${currentNFA.a} is in the final state set.`
+      : `The accept state q${currentNFA.a} was not reached.`;
+    resultBox.classList.add('visible');
+
+    renderTrace();
+    document.getElementById('btnPrev').disabled = true;
+    document.getElementById('btnNext').disabled = traceData.length <= 1;
+    updateStepIndicator();
+  }
+
+  function renderTrace() {
+    const container = document.getElementById('traceSteps');
+    const allStates = new Set([currentNFA.s, currentNFA.a]);
+    for (const [f, es] of currentNFA.t) { allStates.add(f); for (const e of es) allStates.add(e.to); }
+    const stateList = [...allStates].sort((a,b)=>a-b);
+
+    container.innerHTML = '';
+    traceData.forEach((step, i) => {
+      const div = document.createElement('div');
+      div.className = 'trace-step' + (i === traceIdx ? ' current' : i < traceIdx ? ' done' : '');
+      const charHtml = step.char === null
+        ? `<span class="step-char epsilon">start</span>`
+        : `<span class="step-char char">'${step.char}'</span>`;
+      const statesHtml = stateList.map(s => {
+        const inSet = step.states.has(s);
+        const isAcc = s === currentNFA.a;
+        return `<span class="mini-state ${inSet ? (isAcc ? 'accept' : 'active') : ''}">${inSet ? '●' : '○'} q${s}</span>`;
+      }).join('');
+      div.innerHTML = `<span class="step-num">${i}</span>${charHtml}<div><div style="font-size:0.77rem;color:var(--muted);margin-bottom:4px">${step.desc}</div><div class="step-states">${statesHtml}</div></div>`;
+      container.appendChild(div);
+    });
+
+    // compute lit edges: transitions that fire for this step
+    const litEdgeKeys = [];
+    const step = traceData[traceIdx];
+    const prevStep = traceIdx > 0 ? traceData[traceIdx - 1] : null;
+    if (prevStep && step.char !== null) {
+      // highlight transitions from prev active states on this character
+      for (const from of prevStep.states) {
+        if (currentNFA.t.has(from)) {
+          for (const e of currentNFA.t.get(from)) {
+            if (e.label === step.char || e.label === 'ε') {
+              if (step.states.has(e.to)) litEdgeKeys.push(`${from}-${e.to}`);
+            }
+          }
+        }
+      }
+    }
+
+    // animate token movement along lit edges
+    highlightedStates = step.states;
+    selectedState = null;
+    document.getElementById('closure-bar').classList.remove('visible');
+    if (litEdgeKeys.length > 0) {
+      animateTraceStep(currentNFA, step.states, litEdgeKeys);
+    } else {
+      render(currentNFA);
+    }
+
+    const currentEl = container.querySelector('.current');
+    if (currentEl) currentEl.scrollIntoView({ block: 'nearest' });
+  }
+
+  function traceStep(dir) {
+    traceIdx = Math.max(0, Math.min(traceData.length - 1, traceIdx + dir));
+    document.getElementById('btnPrev').disabled = traceIdx === 0;
+    document.getElementById('btnNext').disabled = traceIdx === traceData.length - 1;
+    updateStepIndicator();
+    renderTrace();
+  }
+
+  function updateStepIndicator() {
+    document.getElementById('stepIndicator').textContent = `Step ${traceIdx + 1} / ${traceData.length}`;
+  }
+
+  // ─────────────────────────────────────────────
+  // Construction Walkthrough
+  // ─────────────────────────────────────────────
+  constructionStep_ = 0;
+
+  function renderConstructionLog() {
+    const container = document.getElementById('stepLog');
+    if (!constructionLog.length) {
+      container.innerHTML = '<div class="step-log-entry"><span style="color:var(--muted);font-style:italic;font-size:0.82rem">No steps yet.</span></div>';
+      return;
+    }
+    container.innerHTML = '';
+    constructionLog.forEach((entry, i) => {
+      const div = document.createElement('div');
+      div.className = 'step-log-entry' + (i === constructionStep_ ? ' current-step' : '');
+      const opClass = { cat:'cat', uni:'uni', star:'star', plus:'plus', opt:'opt', char:'char' }[entry.op] || 'char';
+      const opLabel = { cat:'CAT', uni:'UNION', star:'STAR', plus:'PLUS', opt:'OPT', char:'CHAR' }[entry.op] || entry.op;
+      div.innerHTML = `<span class="sl-num">${i+1}</span><span class="sl-op ${opClass}">${opLabel}</span><span class="sl-desc">${entry.desc}</span>`;
+      container.appendChild(div);
+    });
+    const currentEl = container.querySelector('.current-step');
+    if (currentEl) currentEl.scrollIntoView({ block: 'nearest' });
+    document.getElementById('constructionBadge').textContent = `Step ${constructionStep_ + 1} / ${constructionLog.length}`;
+    document.getElementById('btnStepPrev').disabled = constructionStep_ === 0;
+    document.getElementById('btnStepNext').disabled = constructionStep_ === constructionLog.length - 1;
+  }
+
+  function constructionStep(dir) {
+    constructionStep_ = Math.max(0, Math.min(constructionLog.length - 1, constructionStep_ + dir));
+    renderConstructionLog();
+  }
+
+  // ─────────────────────────────────────────────
+  // Parse Tree Renderer
+  // ─────────────────────────────────────────────
+  function renderParseTree(node) {
+    if (!node) return document.createTextNode('');
+    const opClassMap = { CAT:'op-cat', UNION:'op-uni', STAR:'op-star', PLUS:'op-plus', OPT:'op-opt', CHAR:'op-char' };
+    const label = node.op === 'CHAR' ? `'${node.val}'` : node.op;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pt-node';
+    const lbl = document.createElement('span');
+    lbl.className = 'pt-label ' + (opClassMap[node.op] || 'op-char');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+    if (node.children && node.children.length) {
+      const children = document.createElement('div');
+      children.className = 'pt-children';
+      for (const child of node.children) {
+        const branch = document.createElement('div');
+        branch.className = 'pt-branch';
+        const line = document.createElement('div');
+        line.className = 'pt-line';
+        branch.appendChild(line);
+        branch.appendChild(renderParseTree(child));
+        children.appendChild(branch);
+      }
+      wrapper.appendChild(children);
+    }
+    return wrapper;
+  }
+
+  // ─────────────────────────────────────────────
+  // Subset Construction: ε-NFA → DFA
+  // ─────────────────────────────────────────────
+
+  // ── Step 1: Subset Construction (ε-NFA → DFA) ──────────────────────
+  // Records every BFS step so the step-wise walkthrough can replay them.
+  function subsetConstruction(nfa, recordSteps) {
+    const steps = []; // only populated when recordSteps=true
+
+    const symbols = new Set();
+    for (const [, edges] of nfa.t) for (const e of edges) if (e.label !== 'ε') symbols.add(e.label);
+    const syms = [...symbols].sort();
+
+    const startClosure = [...epsilonClosure(nfa, [nfa.s])].sort((a,b) => a-b);
+    const startKey = startClosure.join(',');
+
+    const dfaStates = new Map(); // key → { id, nfaStates[], isAccept, isTrap }
+    const dfaTrans  = new Map(); // id  → { sym → id }
+    let idGen = 0;
+
+    const mkState = (closure) => {
+      const isTrap  = closure.length === 0;
+      const key     = isTrap ? '\u2205' : closure.join(',');
+      if (!dfaStates.has(key)) {
+        dfaStates.set(key, { id: idGen++, nfaStates: closure, isAccept: closure.includes(nfa.a), isTrap });
+      }
+      return key;
+    };
+
+    // --- Initial state ---
+    mkState(startClosure);
+    const startSt = dfaStates.get(startKey);
+    if (recordSteps) {
+      steps.push({
+        phase: 'subset',
+        type: 'init',
+        stateId: startSt.id,
+        stateInfo: { ...startSt },
+        nfaSubset: [...startClosure],
+        epsilonClosureOf: [nfa.s],
+        transitions: [],
+        queueBefore: [],
+        queueAfter: [startKey],
+        allStates: new Map([[startSt.id, { ...startSt }]]),
+        allTrans: new Map(),
+        desc: `Start: ε-closure({q${nfa.s}}) = {${startClosure.map(s=>'q'+s).join(',')}} → new state D${startSt.id}`,
+        detail: `The initial DFA state is the ε-closure of the NFA start state q${nfa.s}. This set becomes D${startSt.id}${startSt.isAccept ? ' (accept)' : ''}.`,
+      });
+    }
+
+    const queue   = [startKey];
+    const visited = new Set([startKey]);
+
+    while (queue.length) {
+      const curKey   = queue.shift();
+      const curState = dfaStates.get(curKey);
+      dfaTrans.set(curState.id, {});
+
+      const stepTransitions = [];
+      const newStatesThisStep = [];
+
+      for (const sym of syms) {
+        const moved = new Set();
+        for (const ns of curState.nfaStates) {
+          if (nfa.t.has(ns)) for (const e of nfa.t.get(ns)) if (e.label === sym) moved.add(e.to);
+        }
+        const closure = [...epsilonClosure(nfa, [...moved])].sort((a,b) => a-b);
+        const toKey   = closure.length === 0 ? '\u2205' : closure.join(',');
+        const isNew   = !dfaStates.has(toKey);
+        mkState(closure);
+        const toState = dfaStates.get(toKey);
+        if (!visited.has(toKey)) { visited.add(toKey); queue.push(toKey); }
+        dfaTrans.get(curState.id)[sym] = toState.id;
+
+        stepTransitions.push({
+          sym,
+          movedNFA: [...moved],
+          closureNFA: [...closure],
+          toId: toState.id,
+          isNew,
+          isTrap: toState.isTrap,
+          isAccept: toState.isAccept,
+        });
+        if (isNew) newStatesThisStep.push(toState.id);
+      }
+
+      if (recordSteps) {
+        // snapshot current DFA state for diagram rendering
+        const snapStates = new Map();
+        for (const [, st] of dfaStates) snapStates.set(st.id, { ...st });
+        const snapTrans = new Map();
+        for (const [fid, tmap] of dfaTrans) snapTrans.set(fid, { ...tmap });
+
+        steps.push({
+          phase: 'subset',
+          type: 'process',
+          stateId: curState.id,
+          stateInfo: { ...curState },
+          nfaSubset: [...curState.nfaStates],
+          transitions: stepTransitions,
+          newStates: newStatesThisStep,
+          queueBefore: [curKey, ...queue].map(k => dfaStates.get(k)?.id),
+          queueAfter: [...queue].map(k => dfaStates.get(k)?.id),
+          allStates: snapStates,
+          allTrans: snapTrans,
+          desc: `Process D${curState.id}: compute transitions for each symbol`,
+          detail: `Reading each input symbol from D${curState.id} = {${curState.nfaStates.map(s=>'q'+s).join(',')}}`,
+        });
+      }
+    }
+
+    const stateById = new Map();
+    for (const [, st] of dfaStates) stateById.set(st.id, st);
+
+    return {
+      startId : dfaStates.get(startKey).id,
+      states  : stateById,
+      trans   : dfaTrans,
+      symbols : syms,
+      steps   : recordSteps ? steps : [],
+    };
+  }
+
+  // ── Step 2: Hopcroft's Minimization Algorithm ──────────────────────
+  // Partition-refinement: merges equivalent states so the result is
+  // the unique minimum-state DFA for the language.
+  function minimizeDFA(dfa) {
+    const { states, trans, symbols, startId } = dfa;
+    const ids = [...states.keys()];
+
+    // Initial partition: accepting vs non-accepting
+    const accepting    = ids.filter(id =>  states.get(id).isAccept);
+    const nonAccepting = ids.filter(id => !states.get(id).isAccept);
+    let partitions = [];
+    if (accepting.length)    partitions.push(new Set(accepting));
+    if (nonAccepting.length) partitions.push(new Set(nonAccepting));
+
+    // Map each state id → its partition index
+    const partOf = new Map();
+    const rebuildPartOf = () => { partitions.forEach((p, i) => p.forEach(id => partOf.set(id, i))); };
+    rebuildPartOf();
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const next = [];
+      for (const group of partitions) {
+        if (group.size <= 1) { next.push(group); continue; }
+
+        // Split group: two states are equivalent iff for every symbol
+        // they transition to the same partition.
+        const signature = (id) =>
+          symbols.map(sym => {
+            const toId = (trans.get(id) || {})[sym];
+            return toId !== undefined ? partOf.get(toId) : -1;
+          }).join('|');
+
+        const buckets = new Map();
+        for (const id of group) {
+          const sig = signature(id);
+          if (!buckets.has(sig)) buckets.set(sig, new Set());
+          buckets.get(sig).add(id);
+        }
+        if (buckets.size > 1) changed = true;
+        for (const bucket of buckets.values()) next.push(bucket);
+      }
+      partitions = next;
+      rebuildPartOf();
+    }
+
+    // Build minimized DFA: one state per partition, renumbered D0..Dn
+    // D0 = partition containing the original start state
+    const startPart = partOf.get(startId);
+    // BFS-order renaming: start from startPart, traverse in BFS order
+    const partRepr  = new Map(); // partIdx → canonical representative id
+    partitions.forEach((p, i) => partRepr.set(i, [...p][0]));
+
+    const bfsOrder  = [];
+    const bfsVisited = new Set([startPart]);
+    const bfsQueue   = [startPart];
+    while (bfsQueue.length) {
+      const pi = bfsQueue.shift();
+      bfsOrder.push(pi);
+      const rep = partRepr.get(pi);
+      for (const sym of symbols) {
+        const toId  = (trans.get(rep) || {})[sym];
+        if (toId === undefined) continue;
+        const toPi  = partOf.get(toId);
+        if (!bfsVisited.has(toPi)) { bfsVisited.add(toPi); bfsQueue.push(toPi); }
+      }
+    }
+    // Any partitions not reachable from start go at the end
+    partitions.forEach((_, i) => { if (!bfsVisited.has(i)) bfsOrder.push(i); });
+
+    const newId = new Map(); // partIdx → new D-number
+    bfsOrder.forEach((pi, i) => newId.set(pi, i));
+
+    const newStates = new Map();
+    const newTrans  = new Map();
+
+    for (const pi of bfsOrder) {
+      const did  = newId.get(pi);
+      const rep  = partRepr.get(pi);
+      const orig = states.get(rep);
+
+      // Collect the union of NFA subsets from all merged states for display
+      const nfaSubset = new Set();
+      for (const id of partitions[pi]) {
+        for (const ns of states.get(id).nfaStates) nfaSubset.add(ns);
+      }
+
+      newStates.set(did, {
+        id        : did,
+        nfaStates : [...nfaSubset].sort((a,b) => a-b),
+        isAccept  : orig.isAccept,
+        isTrap    : orig.isTrap,
+        // for display: show all merged partition members
+        mergedFrom: [...partitions[pi]].map(id => `D${id}`),
+      });
+
+      const tmap = {};
+      for (const sym of symbols) {
+        const toId = (trans.get(rep) || {})[sym];
+        if (toId !== undefined) tmap[sym] = newId.get(partOf.get(toId));
+      }
+      newTrans.set(did, tmap);
+    }
+
+    return {
+      startId : newId.get(startPart),
+      states  : newStates,
+      trans   : newTrans,
+      symbols,
+      minimized: true,
+      // Map from original raw DFA state id → minimized D-number
+      rawToMinMap: new Map(
+        [...states.keys()].map(rawId => [rawId, newId.get(partOf.get(rawId))])
+      ),
+    };
+  }
+
+  // ── DFA Layout ──────────────────────────────
+
+  function dfaLayout(dfa) {
+    const ids = [...dfa.states.keys()];
+    // BFS from start to get levels
+    const level = new Map([[dfa.startId, 0]]);
+    const q = [dfa.startId];
+    while (q.length) {
+      const u = q.shift();
+      const trans = dfa.trans.get(u) || {};
+      for (const to of Object.values(trans)) {
+        if (!level.has(to)) { level.set(to, level.get(u) + 1); q.push(to); }
+      }
+    }
+    for (const id of ids) if (!level.has(id)) level.set(id, 0);
+
+    const groups = new Map();
+    for (const [id, lv] of level) { if (!groups.has(lv)) groups.set(lv, []); groups.get(lv).push(id); }
+    const sorted = [...groups.entries()].sort((a,b) => a[0]-b[0]);
+
+    const HG = 185, VG = 110;
+    const pos = new Map();
+    let x = 80;
+    for (const [, nodes] of sorted) {
+      const totalH = (nodes.length - 1) * VG;
+      nodes.forEach((id, i) => pos.set(id, { x, y: 230 + i * VG - totalH / 2 }));
+      x += HG;
+    }
+    const maxNodes = sorted.reduce((m, [, ns]) => Math.max(m, ns.length), 1);
+    return { pos, W: Math.max(900, x + 80), H: Math.max(480, 260 + maxNodes * VG) };
+  }
+
+  // ── DFA Drawing ─────────────────────────────
+
+  function dfaArrowHead(ctx, x, y, ux, uy, color) {
+    const sz = 10;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - sz*ux + sz*0.42*uy, y - sz*uy - sz*0.42*ux);
+    ctx.lineTo(x - sz*ux - sz*0.42*uy, y - sz*uy + sz*0.42*ux);
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  }
+
+  function dfaDrawArrow(ctx, x1, y1, x2, y2, label, curve, lit, alpha) {
+    const R = 32;
+    ctx.globalAlpha = alpha ?? 1;
+    const baseColor = '#93c5fd';
+    const color = lit ? '#ffffff' : baseColor;
+    ctx.lineWidth = lit ? 3 : 1.8;
+    ctx.strokeStyle = color;
+    ctx.setLineDash([]);
+
+    const dx = x2-x1, dy = y2-y1;
+    const d = Math.sqrt(dx*dx+dy*dy) || 1;
+    const ux = dx/d, uy = dy/d;
+    let lx, ly;
+
+    if (x1 === x2 && y1 === y2) {
+      // self-loop
+      ctx.beginPath(); ctx.arc(x1, y1-R-18, 18, Math.PI*0.25, Math.PI*2.82); ctx.stroke();
+      const ex = x1 + Math.sin(Math.PI*0.25)*18, ey = y1-R-18+Math.cos(Math.PI*0.25)*18;
+      dfaArrowHead(ctx, ex, ey, 0.95, 0.3, color); lx = x1+30; ly = y1-R-40;
+    } else if (curve) {
+      const px = -uy, py = ux;
+      const mx = (x1+x2)/2, my = (y1+y2)/2;
+      const bend = d*0.22*curve;
+      const cx = mx+px*bend, cy = my+py*bend;
+      const sx = x1+ux*R, sy = y1+uy*R;
+      const ex = x2-ux*R, ey = y2-uy*R;
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(cx,cy,ex,ey); ctx.stroke();
+      const tl = Math.sqrt((ex-cx)**2+(ey-cy)**2)||1;
+      dfaArrowHead(ctx, ex, ey, (ex-cx)/tl, (ey-cy)/tl, color);
+      lx = 0.25*sx+0.5*cx+0.25*ex; ly = 0.25*sy+0.5*cy+0.25*ey;
+    } else {
+      const sx = x1+ux*R, sy = y1+uy*R;
+      const ex = x2-ux*R, ey = y2-uy*R;
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+      dfaArrowHead(ctx, ex, ey, ux, uy, color);
+      lx = (sx+ex)/2 - uy*14; ly = (sy+ey)/2 + ux*14;
+    }
+    ctx.setLineDash([]);
+    if (label) {
+      ctx.font = '600 11px JetBrains Mono, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(label).width + 14;
+      ctx.fillStyle = 'rgba(10,15,30,0.92)';
+      dfaRoundRect(ctx, lx-tw/2, ly-10, tw, 20, 7, true, false);
+      ctx.fillStyle = lit ? '#fff' : '#93c5fd';
+      ctx.fillText(label, lx, ly+0.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function dfaRoundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+    if (fill) ctx.fill(); if (stroke) ctx.stroke();
+  }
+
+  function dfaDrawState(ctx, x, y, stateInfo, isStart, highlighted, alpha) {
+    const R = 32;
+    ctx.globalAlpha = alpha ?? 1;
+
+    let fill, stroke, labelColor;
+    if (highlighted) {
+      const pulse = 0.3 + 0.2 * Math.sin(dfaPulseT * 4);
+      fill = `rgba(109,40,217,${pulse + 0.15})`;
+      stroke = '#a78bfa';
+      const grad = ctx.createRadialGradient(x, y, R, x, y, R+16);
+      grad.addColorStop(0, 'rgba(109,40,217,0.45)'); grad.addColorStop(1, 'rgba(109,40,217,0)');
+      ctx.beginPath(); ctx.arc(x, y, R+16, 0, Math.PI*2);
+      ctx.fillStyle = grad; ctx.fill();
+      labelColor = '#e9d5ff';
+    } else if (stateInfo.isTrap) {
+      fill = 'rgba(239,68,68,0.1)'; stroke = 'rgba(239,68,68,0.5)'; labelColor = '#fca5a5';
+    } else if (stateInfo.isAccept) {
+      fill = 'rgba(16,185,129,0.15)'; stroke = '#10b981'; labelColor = '#6ee7b7';
+    } else {
+      fill = 'rgba(255,255,255,0.06)'; stroke = isStart ? '#0891b2' : '#dbeafe'; labelColor = '#f0f8ff';
+    }
+
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2);
+    ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 2.5;
+    ctx.fill(); ctx.stroke();
+
+    // Double ring for accept state
+    if (stateInfo.isAccept) {
+      ctx.beginPath(); ctx.arc(x, y, R-7, 0, Math.PI*2);
+      ctx.strokeStyle = highlighted ? '#a78bfa' : '#10b981'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    // Start arrow
+    if (isStart) {
+      ctx.strokeStyle = highlighted ? '#a78bfa' : '#0891b2'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(x-R-30,y); ctx.lineTo(x-R-4,y); ctx.stroke();
+      dfaArrowHead(ctx, x-R-4, y, 1, 0, highlighted ? '#a78bfa' : '#0891b2');
+    }
+
+    // ── Label: D-number centred inside circle ──
+    const dLabel = stateInfo.isTrap ? '∅' : `D${stateInfo.id}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = labelColor;
+    ctx.font = `700 15px Sora, sans-serif`;
+    ctx.fillText(dLabel, x, y);
+
+    ctx.globalAlpha = 1;
+  }
+
+  function renderDFA(dfa, highlightId, litEdgeSet) {
+    const { pos, W, H } = dfaLayout(dfa);
+    dfaStatePositions = pos;
+    const canvas = document.getElementById('dfaCanvas');
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // draw edges
+    const drawnEdges = new Map();
+    for (const [fromId, symMap] of dfa.trans) {
+      const p1 = pos.get(fromId); if (!p1) continue;
+      // group by destination
+      const byDest = new Map();
+      for (const [sym, toId] of Object.entries(symMap)) {
+        if (!byDest.has(toId)) byDest.set(toId, []);
+        byDest.get(toId).push(sym);
+      }
+      for (const [toId, syms] of byDest) {
+        const p2 = pos.get(toId); if (!p2) continue;
+        const key = `${fromId}-${toId}`, revKey = `${toId}-${fromId}`;
+        let curve = 0;
+        if (fromId !== toId) {
+          const hasRev = dfa.trans.has(toId) && Object.values(dfa.trans.get(toId)).includes(fromId);
+          if (hasRev) curve = drawnEdges.has(revKey) ? 1 : 0.8;
+        }
+        const label = syms.join(',');
+        const lit = litEdgeSet && litEdgeSet.has(key);
+        dfaDrawArrow(ctx, p1.x, p1.y, p2.x, p2.y, label, curve, lit, 1);
+        drawnEdges.set(key, 1);
+      }
+    }
+
+    // draw states
+    for (const [id, stateInfo] of dfa.states) {
+      const p = pos.get(id); if (!p) continue;
+      dfaDrawState(ctx, p.x, p.y, stateInfo, id === dfa.startId, id === highlightId, 1);
+    }
+  }
+
+  // ── DFA Animated Build ───────────────────────
+
+  function animateDFABuild(dfa) {
+    if (dfaAnimRAF) { cancelAnimationFrame(dfaAnimRAF); dfaAnimRAF = null; }
+    dfaAnimState = 'build';
+    dfaHighlighted = null;
+
+    const { pos, W, H } = dfaLayout(dfa);
+    dfaStatePositions = pos;
+    const canvas = document.getElementById('dfaCanvas');
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+    const stateOrder = [...dfa.states.keys()].sort((a,b) => (pos.get(a)?.x??0)-(pos.get(b)?.x??0));
+    const stateAlpha = new Map();
+    stateOrder.forEach(id => stateAlpha.set(id, 0));
+
+    const DURATION = Math.min(1600, 400 + stateOrder.length * 100);
+    const start = performance.now();
+
+    function tick(now) {
+      if (dfaAnimState !== 'build') return;
+      const t = Math.min((now - start) / DURATION, 1);
+
+      stateOrder.forEach((id, i) => {
+        const threshold = (i / Math.max(stateOrder.length-1,1)) * 0.75;
+        stateAlpha.set(id, Math.min(1, easeOut(Math.max(0, (t - threshold) / 0.3))));
+      });
+
+      const canvas = document.getElementById('dfaCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.clearRect(0, 0, parseInt(canvas.style.width), parseInt(canvas.style.height));
+
+      // draw edges at partial alpha
+      const drawnEdges = new Map();
+      for (const [fromId, symMap] of dfa.trans) {
+        const p1 = pos.get(fromId); if (!p1) continue;
+        const byDest = new Map();
+        for (const [sym, toId] of Object.entries(symMap)) {
+          if (!byDest.has(toId)) byDest.set(toId, []);
+          byDest.get(toId).push(sym);
+        }
+        for (const [toId, syms] of byDest) {
+          const p2 = pos.get(toId); if (!p2) continue;
+          const key = `${fromId}-${toId}`, revKey = `${toId}-${fromId}`;
+          let curve = 0;
+          if (fromId !== toId) { const hasRev = dfa.trans.has(toId) && Object.values(dfa.trans.get(toId)).includes(fromId); if (hasRev) curve = drawnEdges.has(revKey) ? 1 : 0.8; }
+          const alpha = Math.max(stateAlpha.get(fromId)??0, stateAlpha.get(toId)??0) * 0.7;
+          dfaDrawArrow(ctx, p1.x, p1.y, p2.x, p2.y, syms.join(','), curve, false, alpha);
+          drawnEdges.set(key, 1);
+        }
+      }
+      for (const [id, st] of dfa.states) {
+        const p = pos.get(id); if (!p) continue;
+        dfaDrawState(ctx, p.x, p.y, st, id === dfa.startId, false, stateAlpha.get(id)??0);
+      }
+
+      if (t < 1) { dfaAnimRAF = requestAnimationFrame(tick); }
+      else { dfaAnimState = null; renderDFA(dfa, null, null); }
+    }
+    dfaAnimRAF = requestAnimationFrame(tick);
+  }
+
+  // ── DFA pulse animation for simulation ───────
+
+  function animateDFAHighlight(dfa, highlightId, litEdgeSet) {
+    if (dfaAnimRAF) { cancelAnimationFrame(dfaAnimRAF); dfaAnimRAF = null; }
+    dfaAnimState = 'sim';
+    dfaHighlighted = highlightId;
+    dfaPulseT = 0;
+    const start = performance.now();
+
+    function tick(now) {
+      if (dfaAnimState !== 'sim') return;
+      dfaPulseT = (now - start) / 1000;
+      renderDFA(dfa, highlightId, litEdgeSet);
+      dfaAnimRAF = requestAnimationFrame(tick);
+    }
+    dfaAnimRAF = requestAnimationFrame(tick);
+  }
+
+  // ── DFA Transition Table ─────────────────────
+
+  function buildDFATable(dfa) {
+    const container = document.getElementById('dfaTableContainer');
+    container.innerHTML = '';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+    const header = document.createElement('tr');
+    header.innerHTML = `<th>DFA State (NFA Subset)</th>` + dfa.symbols.map(s => `<th>${s}</th>`).join('');
+    thead.appendChild(header);
+
+    const sortedIds = [...dfa.states.keys()].sort((a,b) => a-b);
+    for (const id of sortedIds) {
+      const st = dfa.states.get(id);
+      const row = document.createElement('tr');
+      row.dataset.dfaId = id;
+      const prefix = id === dfa.startId ? '▶ ' : '';
+      const dLabel  = st.isTrap ? '∅' : `D${id}`;
+      const suffix  = st.isAccept ? ' ★' : '';
+      const subset  = st.nfaStates.length === 0 ? '∅' : `{${st.nfaStates.map(s=>`q${s}`).join(',')}}`;
+      let rowClass  = st.isAccept ? 'dfa-row-accept' : st.isTrap ? 'dfa-row-trap' : '';
+      row.className = rowClass;
+      // Primary: D-label bold only — no NFA subset shown
+      let html = `<td style="font-family:var(--mono);font-size:0.85rem;font-weight:700;">${prefix}${dLabel}${suffix}</td>`;
+      const trans = dfa.trans.get(id) || {};
+      for (const sym of dfa.symbols) {
+        const toId = trans[sym];
+        if (toId !== undefined) {
+          const toSt  = dfa.states.get(toId);
+          const toLbl = toSt?.isTrap ? '∅' : `D${toId}`;
+          html += `<td style="font-family:var(--mono);font-weight:600;">${toLbl}${toSt?.isAccept ? ' ★' : ''}</td>`;
+        } else {
+          html += `<td style="color:#ef4444;opacity:0.7">—</td>`;
+        }
+      }
+      row.innerHTML = html;
+      tbody.appendChild(row);
+    }
+    table.appendChild(thead); table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  // ── Main convert function ─────────────────────
+
+  function convertToDFA() {
+    if (!currentNFA) return;
+    // Build subset-construction DFA (recording steps) then minimize
+    const rawDFA   = subsetConstruction(currentNFA, true);   // true = record steps
+    currentDFA     = minimizeDFA(rawDFA);
+
+    // show DFA area
+    document.getElementById('dfaPlaceholderMsg').style.display = 'none';
+    document.getElementById('dfaDiagramArea').style.display = 'block';
+    document.getElementById('dfaTableArea').style.display = 'block';
+    document.getElementById('dfaCompare').style.display = 'block';
+    document.getElementById('dfaSimPanel').style.display = 'block';
+    document.getElementById('dfaStepsSection').style.display = 'block';
+
+    // Initialise step-wise panel — remap raw IDs to minimized D-labels
+    initConstructionSteps(rawDFA.steps, rawDFA, currentDFA, currentDFA.rawToMinMap);
+
+    // animate DFA build
+    if (animEnabled) { animateDFABuild(currentDFA); }
+    else { renderDFA(currentDFA, null, null); }
+
+    buildDFATable(currentDFA);
+
+    // stats
+    const acceptCount = [...currentDFA.states.values()].filter(s => s.isAccept).length;
+    const edgeCount = [...currentDFA.trans.values()].reduce((s,t) => s + Object.keys(t).length, 0);
+    document.getElementById('dfaStateCount').textContent = currentDFA.states.size;
+    document.getElementById('dfaEdgeCount').textContent = edgeCount;
+    document.getElementById('dfaAcceptCount').textContent = acceptCount;
+    document.getElementById('dfaStateBadge').textContent = `${currentDFA.states.size} states · Minimized`;
+
+    // NFA vs DFA comparison
+    const nfaStates = new Set([currentNFA.s, currentNFA.a]);
+    let nfaEdges = 0;
+    for (const [, edges] of currentNFA.t) { for (const e of edges) { nfaStates.add(e.to); nfaEdges++; } }
+    // Also show raw DFA size for comparison
+    const rawDFAForCount = rawDFA; // reuse already-computed raw DFA
+    document.getElementById('nfaCompareList').innerHTML = `
+      <li>${nfaStates.size} NFA states</li>
+      <li>${nfaEdges} transitions (incl. ε)</li>
+      <li>Raw DFA (pre-minimization): ${rawDFAForCount.states.size} states</li>
+      <li>ε-moves (free transitions)</li>
+      <li>Multiple active states at once</li>`;
+    document.getElementById('dfaCompareList').innerHTML = `
+      <li>${currentDFA.states.size} states (minimized via Hopcroft)</li>
+      <li>${edgeCount} transitions (no ε)</li>
+      <li>Deterministic — one path per input</li>
+      <li>No epsilon transitions</li>
+      <li>Minimum possible states for this language</li>`;
+
+    // scroll to DFA
+    document.getElementById('dfaSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── DFA Canvas click → highlight ─────────────
+
+  document.getElementById('dfaCanvas').addEventListener('click', function(e) {
+    if (!currentDFA) return;
+    const rect = this.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (this.width / (DPR * rect.width));
+    const my = (e.clientY - rect.top) * (this.height / (DPR * rect.height));
+    for (const [id, pos] of dfaStatePositions) {
+      const dx = mx - pos.x, dy = my - pos.y;
+      if (Math.sqrt(dx*dx + dy*dy) <= 32) {
+        if (dfaAnimState === 'sim') return; // don't interrupt simulation
+        const st = currentDFA.states.get(id);
+        // highlight and show its NFA subset in closure bar
+        dfaHighlighted = id;
+        renderDFA(currentDFA, id, null);
+        // reuse closure bar to show NFA subset
+        const bar = document.getElementById('closure-bar');
+        bar.classList.add('visible');
+        const cs = document.getElementById('closureStates');
+        const subset = st.nfaStates.length === 0 ? '∅' : st.nfaStates.map(s => `q${s}`).join(', ');
+        document.querySelector('.cl-label').textContent = `DFA ${currentDFA.states.get(id)?.isTrap ? '∅' : 'D'+id} = NFA subset:`;
+        cs.innerHTML = st.nfaStates.map(s =>
+          `<span class="closure-state">q${s}${s === currentNFA.s ? ' ▶' : ''}${s === currentNFA.a ? ' ★' : ''}</span>`
+        ).join('') || '<span class="closure-state">∅ (trap)</span>';
+        return;
+      }
+    }
+  });
+
+  // ── DFA String Simulation ────────────────────
+
+  function runDFASim() {
+    if (!currentDFA) { alert('Convert to DFA first!'); return; }
+    const str = document.getElementById('dfaSimStr').value;
+    const chars = str === '' ? [] : str.split('');
+    dfaSimData = [];
+    dfaSimIdx = 0;
+
+    let curId = currentDFA.startId;
+    const curSt = currentDFA.states.get(curId);
+    dfaSimData.push({
+      stateId: curId, stateInfo: curSt,
+      char: null, fromId: null,
+      desc: `Start in DFA state D${curId} = {${curSt.nfaStates.map(s=>`q${s}`).join(',') || '∅'}}`,
+      litEdge: null, rejected: false
+    });
+
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      const trans = currentDFA.trans.get(curId) || {};
+      const toId = trans[ch];
+
+      if (toId === undefined || currentDFA.states.get(curId)?.isTrap) {
+        // dead / no transition
+        dfaSimData.push({
+          stateId: null, stateInfo: null,
+          char: ch, fromId: curId,
+          desc: `Read '${ch}': no transition from D${curId} — string REJECTED`,
+          litEdge: null, rejected: true
+        });
+        // pad remaining as rejected
+        for (let j = i+1; j < chars.length; j++) dfaSimData.push({ stateId: null, stateInfo: null, char: chars[j], fromId: null, desc: '—', litEdge: null, rejected: true });
+        break;
+      }
+
+      const toSt = currentDFA.states.get(toId);
+      dfaSimData.push({
+        stateId: toId, stateInfo: toSt,
+        char: ch, fromId: curId,
+        desc: `Read '${ch}': D${curId} → D${toId} = {${toSt.nfaStates.map(s=>`q${s}`).join(',') || '∅'}}`,
+        litEdge: `${curId}-${toId}`, rejected: false
+      });
+      curId = toId;
+    }
+
+    const lastStep = dfaSimData[dfaSimData.length - 1];
+    const accepted = !lastStep.rejected && lastStep.stateInfo?.isAccept;
+
+    // show result
+    const resultEl = document.getElementById('dfaSimResult');
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `<div class="${accepted ? 'result-header accept' : 'result-header reject'}" style="border-radius:12px;padding:12px 16px;margin-bottom:8px;">
+      <span class="result-icon">${accepted ? '✓' : '✗'}</span>
+      <div>
+        <div style="font-size:0.95rem;font-weight:700;">"${str || 'ε'}" is ${accepted ? 'ACCEPTED' : 'REJECTED'} by the DFA</div>
+        <div style="font-size:0.78rem;opacity:0.75;margin-top:2px;">${accepted ? `Ended in accept state D${lastStep.stateId}` : lastStep.rejected ? 'No valid transition — reached dead end' : `Ended in non-accept state D${lastStep.stateId}`}</div>
+      </div>
+    </div>`;
+
+    // show tape
+    renderDFATape(chars, 0);
+    document.getElementById('tapeWrap').style.display = 'block';
+    document.getElementById('dfaSimControls').style.display = 'block';
+    document.getElementById('btnDFAPrev').disabled = true;
+    document.getElementById('btnDFANext').disabled = dfaSimData.length <= 1;
+    document.getElementById('dfaStepIndicator').textContent = `Step 1 / ${dfaSimData.length}`;
+
+    renderDFASimSteps();
+    highlightDFAStep(0);
+  }
+
+  function renderDFATape(chars, currentCharIdx) {
+    const container = document.getElementById('tapeCells');
+    container.innerHTML = '';
+    if (chars.length === 0) {
+      container.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">ε (empty string)</span>';
+      return;
+    }
+    chars.forEach((ch, i) => {
+      const cell = document.createElement('div');
+      const simStep = dfaSimData[dfaSimIdx];
+      let cls = 'tape-cell';
+      if (i < currentCharIdx) cls += ' consumed';
+      else if (i === currentCharIdx) {
+        if (simStep?.rejected) cls += ' rejected';
+        else if (simStep?.stateInfo?.isAccept && i === chars.length - 1 && dfaSimIdx === dfaSimData.length - 1) cls += ' accepted';
+        else cls += ' current';
+      }
+      cell.className = cls;
+      cell.textContent = ch;
+      container.appendChild(cell);
+    });
+  }
+
+  function renderDFASimSteps() {
+    const container = document.getElementById('dfaSimSteps');
+    container.innerHTML = '';
+    dfaSimData.forEach((step, i) => {
+      const div = document.createElement('div');
+      div.className = 'dfa-sim-step' + (i === dfaSimIdx ? ' current' : i < dfaSimIdx ? ' done' : '');
+      const charHtml = step.char === null
+        ? `<span class="ss-char" style="color:var(--warning)">start</span>`
+        : `<span class="ss-char">'${step.char}'</span>`;
+      let stateClass = 'ss-state';
+      if (step.stateInfo?.isAccept) stateClass += ' accepting';
+      if (step.stateInfo?.isTrap || step.rejected) stateClass += ' trap';
+      const stateHtml = step.stateId !== null
+        ? `<span class="${stateClass}">D${step.stateId}</span>`
+        : `<span class="${stateClass} trap">DEAD</span>`;
+      div.innerHTML = `<span class="sl-num" style="min-width:22px;font-family:var(--mono);font-size:0.75rem;color:var(--muted)">${i}</span>${charHtml}${stateHtml}<span class="ss-desc">${step.desc}</span>`;
+      container.appendChild(div);
+    });
+    const cur = container.querySelector('.current');
+    if (cur) cur.scrollIntoView({ block: 'nearest' });
+  }
+
+  function highlightDFAStep(idx) {
+    const step = dfaSimData[idx];
+    if (!step) return;
+    const litEdges = step.litEdge ? new Set([step.litEdge]) : null;
+    if (step.stateId !== null) {
+      if (animEnabled) animateDFAHighlight(currentDFA, step.stateId, litEdges);
+      else renderDFA(currentDFA, step.stateId, litEdges);
+    } else {
+      if (dfaAnimRAF) { cancelAnimationFrame(dfaAnimRAF); dfaAnimRAF = null; dfaAnimState = null; }
+      renderDFA(currentDFA, null, null);
+    }
+    // highlight table row
+    document.querySelectorAll('#dfaTableContainer tr').forEach(r => r.classList.remove('dfa-row-active'));
+    if (step.stateId !== null) {
+      const row = document.querySelector(`#dfaTableContainer tr[data-dfa-id="${step.stateId}"]`);
+      if (row) { row.classList.add('dfa-row-active'); row.scrollIntoView({ block: 'nearest' }); }
+    }
+    // update tape
+    const charIdx = Math.max(0, idx - 1);
+    const str = document.getElementById('dfaSimStr').value;
+    renderDFATape(str.split(''), idx === 0 ? 0 : charIdx);
+  }
+
+  function dfaSimStep(dir) {
+    dfaSimIdx = Math.max(0, Math.min(dfaSimData.length - 1, dfaSimIdx + dir));
+    document.getElementById('btnDFAPrev').disabled = dfaSimIdx === 0;
+    document.getElementById('btnDFANext').disabled = dfaSimIdx === dfaSimData.length - 1;
+    document.getElementById('dfaStepIndicator').textContent = `Step ${dfaSimIdx + 1} / ${dfaSimData.length}`;
+    renderDFASimSteps();
+    highlightDFAStep(dfaSimIdx);
+  }
+
+  let dfaAutoTimer = null;
+  function autoPlayDFA() {
+    if (dfaSimData.length === 0) { runDFASim(); return; }
+    if (dfaAutoTimer) { clearInterval(dfaAutoTimer); dfaAutoTimer = null; document.getElementById('btnDFAPlay').textContent = '⏵'; return; }
+    document.getElementById('btnDFAPlay').textContent = '⏸';
+    dfaAutoTimer = setInterval(() => {
+      if (dfaSimIdx < dfaSimData.length - 1) { dfaSimStep(1); }
+      else { clearInterval(dfaAutoTimer); dfaAutoTimer = null; document.getElementById('btnDFAPlay').textContent = '⏵'; }
+    }, 900);
+  }
+
+  document.getElementById('dfaSimStr').addEventListener('keydown', e => { if (e.key === 'Enter') runDFASim(); });
+
+  // ─────────────────────────────────────────────
+  // Main build function
+  // ─────────────────────────────────────────────
+  function build() {
+    const val = document.getElementById('re').value;
+    const err = document.getElementById('err');
+    err.style.display = 'none';
+    highlightedStates = new Set();
+    selectedState = null;
+    document.getElementById('closure-bar').classList.remove('visible');
+
+    try {
+      const nfa = parseRE(val);
+      currentNFA = nfa;
+      animateBuild(nfa);   // ← animated reveal
+      buildTable(nfa);
+      updateStats(nfa);
+
+      // Enable DFA button, reset DFA state
+      document.getElementById('btnConvert').disabled = false;
+      currentDFA = null;
+      dfaSimData = [];
+      document.getElementById('dfaDiagramArea').style.display = 'none';
+      document.getElementById('dfaTableArea').style.display = 'none';
+      document.getElementById('dfaCompare').style.display = 'none';
+      document.getElementById('dfaSimPanel').style.display = 'none';
+      document.getElementById('dfaPlaceholderMsg').style.display = 'block';
+      document.getElementById('dfaStateBadge').textContent = 'No DFA yet';
+      if (dfaAnimRAF) { cancelAnimationFrame(dfaAnimRAF); dfaAnimRAF = null; }
+
+      // Construction walkthrough
+      constructionStep_ = 0;
+      renderConstructionLog();
+
+      // Parse tree
+      const ptArea = document.getElementById('parseTreeArea');
+      ptArea.innerHTML = '';
+      if (parseTree) ptArea.appendChild(renderParseTree(parseTree));
+
+      // Reset tester
+      document.getElementById('resultBox').classList.remove('visible');
+      traceData = [];
+      document.getElementById('btnPrev').disabled = true;
+      document.getElementById('btnNext').disabled = true;
+      document.getElementById('traceSteps').innerHTML = '';
+
+    } catch (e) {
+      err.textContent = '⚠ Error: ' + e.message;
+      err.style.display = 'block';
+      document.getElementById('table-container').innerHTML = '';
+      ['stateCount','edgeCount','symbolCount'].forEach(id => document.getElementById(id).textContent = '0');
+      document.getElementById('startAccept').textContent = '—';
+      const canvas = document.getElementById('c');
+      canvas.width = 0; canvas.height = 0;
+      document.getElementById('canvasPlaceholder').style.display = 'block';
+      currentNFA = null;
+    }
+  }
+
+  function setExample(value) {
+    document.getElementById('re').value = value;
+    build();
+  }
+
+  function insertEpsilon() {
+    const inputField = document.getElementById('re');
+    const start = inputField.selectionStart;
+    const end = inputField.selectionEnd;
+    const currentValue = inputField.value;
+    const epsilon = 'ε';
+    
+    // Replace selected text or insert at cursor position
+    inputField.value = currentValue.substring(0, start) + epsilon + currentValue.substring(end);
+    
+    // Move cursor after the inserted epsilon
+    const newPosition = start + epsilon.length;
+    inputField.setSelectionRange(newPosition, newPosition);
+    
+    // Focus back on input field
+    inputField.focus();
+  }
+
+  function clearAll() {
+    document.getElementById('re').value = '';
+    document.getElementById('err').style.display = 'none';
+    document.getElementById('table-container').innerHTML = '';
+    ['stateCount','edgeCount','symbolCount'].forEach(id => document.getElementById(id).textContent = '0');
+    document.getElementById('startAccept').textContent = '—';
+    const canvas = document.getElementById('c');
+    canvas.width = 0; canvas.height = 0;
+    document.getElementById('canvasPlaceholder').style.display = 'block';
+    document.getElementById('resultBox').classList.remove('visible');
+    document.getElementById('closure-bar').classList.remove('visible');
+    document.getElementById('stepLog').innerHTML = '<div class="step-log-entry"><span style="color:var(--muted);font-style:italic;font-size:0.82rem">Construction steps will appear here after you build an NFA.</span></div>';
+    document.getElementById('parseTreeArea').innerHTML = '<span class="pt-placeholder">Parse tree will appear here after building an NFA.</span>';
+    document.getElementById('constructionBadge').textContent = 'Build an NFA first';
+    document.getElementById('btnStepPrev').disabled = true;
+    document.getElementById('btnStepNext').disabled = true;
+    currentNFA = null; highlightedStates = new Set(); selectedState = null; traceData = [];
+    constructionSteps = []; constructionStepIdx = 0; rawDFARef = null;
+    if (constructionAutoTimer) { clearInterval(constructionAutoTimer); constructionAutoTimer = null; constructionAutoRunning = false; }
+    document.getElementById('dfaStepsSection').style.display = 'none';
+    document.getElementById('dfaStepLog').innerHTML = '';
+    ['btnStepFirst','btnStepBack','btnStepFwd','btnStepLast','btnStepAuto'].forEach(id => {
+      document.getElementById(id).disabled = true;
+    });
+    document.getElementById('dfaStepsIndicator').textContent = '—';
+    currentDFA = null; dfaSimData = [];
+    document.getElementById('btnConvert').disabled = true;
+    document.getElementById('dfaDiagramArea').style.display = 'none';
+    document.getElementById('dfaTableArea').style.display = 'none';
+    document.getElementById('dfaCompare').style.display = 'none';
+    document.getElementById('dfaSimPanel').style.display = 'none';
+    document.getElementById('dfaPlaceholderMsg').style.display = 'block';
+    document.getElementById('dfaStateBadge').textContent = 'No DFA yet';
+    document.getElementById('dfaSimResult').style.display = 'none';
+    document.getElementById('tapeWrap').style.display = 'none';
+    document.getElementById('dfaSimControls').style.display = 'none';
+    if (dfaAnimRAF) { cancelAnimationFrame(dfaAnimRAF); dfaAnimRAF = null; }
+    if (dfaAutoTimer) { clearInterval(dfaAutoTimer); dfaAutoTimer = null; }
+  }
+
+  // ─────────────────────────────────────────────
+  // Animation on/off toggle
+  // ─────────────────────────────────────────────
+  let animEnabled = true;
+  function toggleAnim(cb) { animEnabled = cb.checked; }
+
+  // Wrap animated functions to respect toggle
+  const _animateBuild = animateBuild;
+  animateBuild = (nfa) => { if (animEnabled) _animateBuild(nfa); else render(nfa); };
+  const _animateClosureRipple = animateClosureRipple;
+  animateClosureRipple = (nfa, s, c) => { if (animEnabled) _animateClosureRipple(nfa, s, c); else render(nfa); };
+  const _animateTraceStep = animateTraceStep;
+  animateTraceStep = (nfa, states, edges) => { if (animEnabled) _animateTraceStep(nfa, states, edges); else render(nfa); };
+
+  // ─────────────────────────────────────────────
+  // Theory toggle
+  // ─────────────────────────────────────────────
+  function toggleTheory() {
+    const body = document.getElementById('theoryBody');
+    const chevron = document.getElementById('chevron');
+    const header = document.querySelector('.theory-header');
+    const open = body.classList.toggle('open');
+    chevron.classList.toggle('open', open);
+    header.classList.toggle('open', open);
+  }
+
+  // ─────────────────────────────────────────────
+  // Export
+  // ─────────────────────────────────────────────
+  function downloadCanvas() {
+    const canvas = document.getElementById('c');
+    if (!canvas.width) { alert('Build an NFA first!'); return; }
+    const link = document.createElement('a');
+    link.download = 'nfa-diagram.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  function copyNotes() {
+    const notes = document.getElementById('notes').value;
+    if (!notes.trim()) { alert('No notes to copy!'); return; }
+    navigator.clipboard.writeText(notes).then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => btn.textContent = orig, 1500);
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Step-wise DFA Construction Engine
+  // ─────────────────────────────────────────────
+
+  let constructionSteps  = [];   // array of step objects from subsetConstruction
+  let constructionStepIdx = 0;   // current step index
+  let constructionAutoTimer = null;
+  let rawDFARef = null;          // the raw (pre-minimization) DFA for partial renders
+
+  // Initialise steps after convertToDFA runs
+  // minDFA is the final minimized DFA; rawDFA is the pre-minimization one.
+  // We build a rawId→minId map so every step diagram uses the final D-labels.
+  function initConstructionSteps(steps, rawDFA, minDFA, rawToMinMap) {
+    // Remap every step's stateId, allStates, allTrans using rawToMinMap
+    constructionSteps = steps.map(step => {
+      const remappedStates = new Map();
+      for (const [rawId, stInfo] of step.allStates) {
+        const minId = rawToMinMap.get(rawId);
+        if (minId === undefined) continue;
+        // Use the final minimized state info (correct isAccept, isTrap)
+        const minStateInfo = minDFA.states.get(minId);
+        if (minStateInfo) remappedStates.set(minId, { ...minStateInfo });
+      }
+
+      const remappedTrans = new Map();
+      for (const [rawFrom, symMap] of step.allTrans) {
+        const minFrom = rawToMinMap.get(rawFrom);
+        if (minFrom === undefined) continue;
+        const remapped = {};
+        for (const [sym, rawTo] of Object.entries(symMap)) {
+          const minTo = rawToMinMap.get(rawTo);
+          if (minTo !== undefined) remapped[sym] = minTo;
+        }
+        remappedTrans.set(minFrom, remapped);
+      }
+
+      const minStateId  = rawToMinMap.get(step.stateId) ?? step.stateId;
+      const minStateInfo = minDFA.states.get(minStateId) ?? step.stateInfo;
+
+      // Remap queueAfter IDs
+      const remappedQueue = (step.queueAfter ?? [])
+        .map(rawId => rawToMinMap.get(rawId))
+        .filter(id => id !== undefined);
+
+      // Remap transition chips
+      const remappedTransitions = (step.transitions ?? []).map(t => ({
+        ...t,
+        toId    : rawToMinMap.get(t.toId) ?? t.toId,
+        isTrap  : minDFA.states.get(rawToMinMap.get(t.toId))?.isTrap  ?? t.isTrap,
+        isAccept: minDFA.states.get(rawToMinMap.get(t.toId))?.isAccept ?? t.isAccept,
+      }));
+
+      return {
+        ...step,
+        stateId    : minStateId,
+        stateInfo  : minStateInfo,
+        allStates  : remappedStates,
+        allTrans   : remappedTrans,
+        queueAfter : remappedQueue,
+        transitions: remappedTransitions,
+        // Rewrite desc to use minimized label
+        desc: step.desc.replace(/\bD(\d+)\b/g, (_, n) => {
+          const mapped = rawToMinMap.get(Number(n));
+          return mapped !== undefined ? `D${mapped}` : `D${n}`;
+        }),
+      };
+    });
+
+    constructionStepIdx = 0;
+    rawDFARef = minDFA; // use minimized DFA for layout so diagram matches final
+
+    renderConstructionStepLog();
+    gotoConstructionStep(0);
+
+    ['btnStepFirst','btnStepBack','btnStepFwd','btnStepLast','btnStepAuto'].forEach(id => {
+      document.getElementById(id).disabled = false;
+    });
+    updateConstructionStepControls();
+
+    // Auto-open the panel
+    const body = document.getElementById('dfaStepsBody');
+    const hdr  = document.getElementById('dfaStepsToggle');
+    const chev = document.getElementById('stepsChevron');
+    if (!body.classList.contains('open')) {
+      body.classList.add('open');
+      hdr.classList.add('open');
+      chev.textContent = '▲';
+    }
+  }
+
+  function toggleDFASteps() {
+    const body = document.getElementById('dfaStepsBody');
+    const hdr  = document.getElementById('dfaStepsToggle');
+    const chev = document.getElementById('stepsChevron');
+    const open = body.classList.toggle('open');
+    hdr.classList.toggle('open', open);
+    chev.textContent = open ? '▲' : '▼';
+  }
+
+  function renderConstructionStepLog() {
+    const log = document.getElementById('dfaStepLog');
+    log.innerHTML = '';
+    constructionSteps.forEach((step, i) => {
+      const div = document.createElement('div');
+      div.className = 'dfa-step-entry' + (i === constructionStepIdx ? ' active' : '');
+      div.onclick = () => gotoConstructionStep(i);
+
+      // Build transition chips HTML — show only D-labels, no NFA subsets
+      let transHtml = '';
+      if (step.transitions && step.transitions.length) {
+        transHtml = '<div class="dse-transitions">' +
+          step.transitions.map(t => {
+            const lbl = t.isTrap ? '∅' : `D${t.toId}`;
+            return `<span class="dse-trans-chip">${t.sym}→${lbl}${t.isAccept?' ★':''}${t.isNew?' 🆕':''}</span>`;
+          }).join('') + '</div>';
+      }
+
+      // State tag — use clean D-label
+      const dLabel   = step.stateInfo?.isTrap ? '∅' : `D${step.stateId}`;
+      const stateTag = step.type === 'init'
+        ? `<span class="dse-state-tag new-state">${dLabel} 🆕</span>`
+        : `<span class="dse-state-tag exist-state">${dLabel}</span>`;
+
+      div.innerHTML = `
+        <span class="dse-num">${i+1}</span>
+        <div class="dse-body">
+          <div class="dse-title">
+            <span class="phase-badge subset">SC</span>
+            ${stateTag}
+            ${step.stateInfo?.isAccept ? '<span class="dse-state-tag accept-tag">accept</span>' : ''}
+          </div>
+          <div class="dse-detail">${step.desc}</div>
+          ${transHtml}
+        </div>`;
+      log.appendChild(div);
+    });
+  }
+
+  function gotoConstructionStep(idx) {
+    constructionStepIdx = Math.max(0, Math.min(constructionSteps.length - 1, idx));
+    // Refresh log highlights
+    document.querySelectorAll('.dfa-step-entry').forEach((el, i) => {
+      el.classList.toggle('active', i === constructionStepIdx);
+    });
+    const active = document.querySelector('.dfa-step-entry.active');
+    if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+    renderConstructionStepDiagram();
+    updateConstructionStepControls();
+  }
+
+  function constructionStepNav(dir) {
+    gotoConstructionStep(constructionStepIdx + dir);
+  }
+
+  function updateConstructionStepControls() {
+    const n = constructionSteps.length;
+    const i = constructionStepIdx;
+    document.getElementById('btnStepFirst').disabled = i === 0;
+    document.getElementById('btnStepBack').disabled  = i === 0;
+    document.getElementById('btnStepFwd').disabled   = i >= n - 1;
+    document.getElementById('btnStepLast').disabled  = i >= n - 1;
+    document.getElementById('dfaStepsIndicator').textContent =
+      n ? `Step ${i+1} / ${n}` : '—';
+  }
+
+  let constructionAutoRunning = false;
+  function toggleConstructionAuto() {
+    const btn = document.getElementById('btnStepAuto');
+    if (constructionAutoRunning) {
+      clearInterval(constructionAutoTimer);
+      constructionAutoRunning = false;
+      btn.textContent = '⏵ Auto';
+      btn.classList.remove('autoplay-active');
+    } else {
+      constructionAutoRunning = true;
+      btn.textContent = '⏸ Pause';
+      btn.classList.add('autoplay-active');
+      constructionAutoTimer = setInterval(() => {
+        if (constructionStepIdx < constructionSteps.length - 1) {
+          gotoConstructionStep(constructionStepIdx + 1);
+        } else {
+          clearInterval(constructionAutoTimer);
+          constructionAutoRunning = false;
+          btn.textContent = '⏵ Auto';
+          btn.classList.remove('autoplay-active');
+        }
+      }, 1200);
+    }
+  }
+
+  // Render a partial DFA diagram showing only states/edges known up to this step
+  function renderConstructionStepDiagram() {
+    const step = constructionSteps[constructionStepIdx];
+    if (!step) return;
+
+    const canvas = document.getElementById('dfaStepCanvas');
+    const ctx    = canvas.getContext('2d');
+
+    // Build a partial DFA object from step snapshot
+    const partialDFA = {
+      startId : rawDFARef.startId,
+      states  : step.allStates,
+      trans   : step.allTrans,
+      symbols : rawDFARef.symbols,
+    };
+
+    // Layout using the same dfaLayout function
+    const { pos, W, H } = dfaLayout(partialDFA);
+
+    canvas.width  = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw existing edges
+    const drawnEdges = new Map();
+    for (const [fromId, symMap] of partialDFA.trans) {
+      const p1 = pos.get(fromId); if (!p1) continue;
+      const byDest = new Map();
+      for (const [sym, toId] of Object.entries(symMap)) {
+        if (!byDest.has(toId)) byDest.set(toId, []);
+        byDest.get(toId).push(sym);
+      }
+      for (const [toId, syms] of byDest) {
+        const p2 = pos.get(toId); if (!p2) continue;
+        const key = `${fromId}-${toId}`, rev = `${toId}-${fromId}`;
+        let curve = 0;
+        if (fromId !== toId) {
+          const hasRev = partialDFA.trans.has(toId) && Object.values(partialDFA.trans.get(toId)).includes(fromId);
+          if (hasRev) curve = drawnEdges.has(rev) ? 1 : 0.8;
+        }
+        // Highlight edges from/to current step state
+        const isActive = fromId === step.stateId || toId === step.stateId;
+        dfaDrawArrow(ctx, p1.x, p1.y, p2.x, p2.y, syms.join(','), curve, isActive, 1);
+        drawnEdges.set(key, 1);
+      }
+    }
+
+    // Draw states; highlight the current processing state
+    for (const [id, stateInfo] of partialDFA.states) {
+      const p = pos.get(id); if (!p) continue;
+      const isCurrentStep = id === step.stateId;
+      dfaDrawState(ctx, p.x, p.y, stateInfo, id === partialDFA.startId, isCurrentStep, 1);
+    }
+
+    // Update info bar — show only the D-label, no NFA subset
+    const stateLabel = step.stateInfo?.isTrap ? '∅' : `D${step.stateId}`;
+    const acceptMark = step.stateInfo?.isAccept ? ' ★ accept' : '';
+    document.getElementById('dfaStepStateInfo').textContent =
+      `Processing ${stateLabel}${acceptMark}`;
+
+    const qAfter = step.queueAfter ?? [];
+    document.getElementById('dfaStepQueueInfo').textContent =
+      qAfter.length
+        ? `Unprocessed: [${qAfter.map(id => 'D'+id).join(', ')}]`
+        : 'All states processed — construction complete ✓';
+
+    // Update phase badge
+    document.getElementById('stepPhaseBadge').textContent = 'Minimized DFA';
+  }
+
+  // ─────────────────────────────────────────────
+  // Superscript Mirror for Regex Input
+  // ─────────────────────────────────────────────
+  // The #reMirror contenteditable div shows * + ? as superscripts.
+  // The hidden #re input is kept in sync with the raw plain-text value
+  // so all existing build/parse/insertEpsilon code works unchanged.
+
+  const SUPERSCRIPT_OPS = new Set(['*', '+', '?']);
+
+  // Extract plain text from the mirror (strips HTML tags)
+  function mirrorToPlain(el) {
+    // Walk text nodes; <sup> content is included as-is
+    let text = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      } else if (node.nodeName === 'SUP') {
+        text += node.textContent;
+      } else if (node.nodeName === 'BR') {
+        // ignore line breaks
+      } else {
+        text += node.textContent;
+      }
+    }
+    return text;
+  }
+
+  // Save + restore caret position across innerHTML rewrites
+  function getCaretOffset(el) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return 0;
+    const range = sel.getRangeAt(0).cloneRange();
+    range.selectNodeContents(el);
+    range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+    return range.toString().length + countSupOffset(el, sel.getRangeAt(0));
+  }
+
+  function countSupOffset(el, range) {
+    // Count characters in <sup> nodes before the caret
+    let extra = 0;
+    for (const node of el.childNodes) {
+      if (node.nodeName === 'SUP') {
+        if (range.comparePoint(node, 0) > 0) break;
+        extra += node.textContent.length - node.textContent.length; // sup char = 1 raw char
+      }
+    }
+    return extra;
+  }
+
+  function setCaretToOffset(el, offset) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    let remaining = offset;
+    for (const node of el.childNodes) {
+      const len = node.textContent.length;
+      if (remaining <= len) {
+        const range = document.createRange();
+        if (node.nodeType === Node.TEXT_NODE) {
+          range.setStart(node, remaining);
+        } else {
+          // inside a <sup> or other element
+          range.setStart(node, Math.min(remaining, node.childNodes.length));
+        }
+        range.collapse(true);
+        sel.addRange(range);
+        return;
+      }
+      remaining -= len;
+    }
+    // fallback: end of element
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel.addRange(range);
+  }
+
+  // Rebuild mirror HTML from plain text, wrapping * + ? in <sup>
+  function buildMirrorHTML(plain) {
+    let html = '';
+    for (const ch of plain) {
+      if (SUPERSCRIPT_OPS.has(ch)) {
+        html += `<sup>${ch}</sup>`;
+      } else {
+        // Escape HTML special chars
+        html += ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch;
+      }
+    }
+    return html;
+  }
+
+  // Sync mirror → hidden input (called on every input event)
+  function syncMirror() {
+    const mirror = document.getElementById('reMirror');
+    const hidden = document.getElementById('re');
+    const plain  = mirrorToPlain(mirror);
+    hidden.value = plain;
+
+    // Save caret, rewrite HTML, restore caret
+    const caretBefore = getCaretOffset(mirror);
+    const newHTML = buildMirrorHTML(plain);
+
+    // Only rewrite if HTML actually changed (avoids cursor jumps on normal typing)
+    if (mirror.innerHTML !== newHTML) {
+      mirror.innerHTML = newHTML || '';
+      setCaretToOffset(mirror, caretBefore);
+    }
+  }
+
+  // Populate mirror from a plain-text value (used by setExample, clearAll, insertEpsilon)
+  function setMirrorValue(plain) {
+    const mirror = document.getElementById('reMirror');
+    const hidden = document.getElementById('re');
+    hidden.value = plain;
+    mirror.innerHTML = buildMirrorHTML(plain);
+  }
+
+  // Wire up the mirror div
+  const reMirror = document.getElementById('reMirror');
+
+  reMirror.addEventListener('input', syncMirror);
+
+  // Prevent newlines
+  reMirror.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); build(); }
+  });
+
+  // Patch setExample, clearAll, and insertEpsilon to use mirror
+  const _origSetExample = setExample;
+  setExample = function(value) {
+    setMirrorValue(value);
+    build();
+  };
+
+  const _origClearAll = clearAll;
+  clearAll = function() {
+    _origClearAll();
+    setMirrorValue('');
+  };
+
+  const _origInsertEpsilon = insertEpsilon;
+  insertEpsilon = function() {
+    // Insert ε at caret position in the mirror
+    const mirror = document.getElementById('reMirror');
+    const sel = window.getSelection();
+    if (sel.rangeCount && mirror.contains(sel.getRangeAt(0).startContainer)) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode('ε'));
+      range.collapse(false);
+      sel.removeAllRanges(); sel.addRange(range);
+    } else {
+      // Fallback: append
+      mirror.innerHTML += 'ε';
+    }
+    syncMirror();
+    mirror.focus();
+  };
+
+  // Focus mirror on load
+  reMirror.focus();
+
+  // ─────────────────────────────────────────────
+  // Keyboard shortcut
+  // ─────────────────────────────────────────────
+  document.getElementById('re').addEventListener('keydown', e => { if (e.key === 'Enter') build(); });
+  document.getElementById('testStr').addEventListener('keydown', e => { if (e.key === 'Enter') runTest(); });
+</script>
+
+<script>
+const mirror = document.getElementById("reMirror");
+const hiddenInput = document.getElementById("re");
+
+// Keep hidden input synced
+mirror.addEventListener("input", () => {
+  hiddenInput.value = mirror.innerText;
+});
+
+// Handle special characters without breaking cursor
+mirror.addEventListener("beforeinput", (e) => {
+  if (e.data === "+" || e.data === "*") {
+    e.preventDefault();
+
+    const sel = window.getSelection();
+    const range = sel.getRangeAt(0);
+
+    const sup = document.createElement("sup");
+    sup.textContent = e.data;
+
+    range.insertNode(sup);
+
+    // Move cursor after inserted node
+    range.setStartAfter(sup);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+});
+</script>
+
+</body>
+</html>
